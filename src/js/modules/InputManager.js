@@ -23,7 +23,11 @@ export class InputManager {
     }
     this.keys[e.code] = true;
 
-    if (!this.menuManager || !this.menuManager.isOpen) {
+    // Prevent pilot keys and in-flight configs if pre-flight main menu is open
+    const mainMenu = this.engine ? this.engine.moduleManager.get('MainMenu') : null;
+    const mainMenuOpen = mainMenu ? mainMenu.isOpen : false;
+
+    if (!mainMenuOpen && (!this.menuManager || !this.menuManager.isOpen)) {
       const aircraft = this.aircraftManager ? this.aircraftManager.activeAircraft : null;
       if (aircraft) {
         // G key: Toggle landing gear retraction
@@ -92,8 +96,11 @@ export class InputManager {
     aircraft.controls.roll = 0;
     aircraft.controls.yaw = 0;
 
-    // Lock controls if hangar selection menu is open or crashed
-    if ((this.menuManager && this.menuManager.isOpen) || aircraft.isCrashed) {
+    // Lock controls if hangar selection menu is open, main pre-flight menu is open, or crashed
+    const mainMenu = this.engine.moduleManager.get('MainMenu');
+    const mainMenuOpen = mainMenu ? mainMenu.isOpen : false;
+
+    if (mainMenuOpen || (this.menuManager && this.menuManager.isOpen) || aircraft.isCrashed) {
       return;
     }
 

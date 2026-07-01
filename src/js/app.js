@@ -6,6 +6,7 @@ import { CameraManager } from './modules/CameraManager.js';
 import { InputManager } from './modules/InputManager.js';
 import { HudManager } from './modules/HudManager.js';
 import { MenuManager } from './modules/MenuManager.js';
+import { MainMenuManager } from './modules/MainMenuManager.js';
 import { TerrainManager } from './modules/TerrainManager.js';
 import { WeatherManager } from './modules/WeatherManager.js';
 
@@ -52,14 +53,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const menuManager = new MenuManager();
     moduleManager.register('Menu', menuManager);
 
+    // 11. Register the Pre-Flight Main Menu Manager
+    const mainMenuManager = new MainMenuManager();
+    moduleManager.register('MainMenu', mainMenuManager);
+
     // Initialize all modules sequentially
     moduleManager.initAll();
 
-    // 11. Start the global simulation rendering ticking loop
+    // 12. Start the global simulation rendering ticking loop
     engine.start();
 
   } catch (error) {
-    console.error("Initialization failure during Milestone 10 setup:", error);
+    console.error("Initialization failure during startup setup:", error);
     const overlay = document.getElementById('hud-overlay');
     if (overlay) {
       overlay.innerHTML = `<div style="background: rgba(20,0,0,0.85); color: #ff5555; padding: 20px; border: 2px solid red; margin: 30px; border-radius: 8px;">` +

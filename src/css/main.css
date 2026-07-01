@@ -45,6 +45,114 @@ html, body {
   z-index: 1;
 }
 
+/* Pre-Flight Main Startup Screen Styles */
+#main-menu-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(8, 12, 16, 0.9) 0%, rgba(12, 20, 24, 0.6) 100%);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  padding-left: 8%;
+  backdrop-filter: blur(5px);
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+#main-menu-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#main-menu-content {
+  width: 500px;
+  font-family: Consolas, "Courier New", monospace;
+  color: #ffffff;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+}
+
+.menu-brand {
+  font-size: 2.8rem;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #00ff66;
+  text-shadow: 0 0 8px rgba(0, 255, 102, 0.5);
+  margin-bottom: 5px;
+}
+
+.menu-tagline {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #a0aec0;
+  margin-bottom: 40px;
+  border-bottom: 1.5px solid rgba(0, 255, 102, 0.2);
+  padding-bottom: 15px;
+}
+
+.menu-main-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 60px;
+}
+
+.menu-main-actions button {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 14px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  pointer-events: auto;
+}
+
+.menu-primary-btn {
+  background: #00ff66;
+  border: 1px solid #00ff66;
+  color: #0c0f12;
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.3);
+}
+
+.menu-primary-btn:hover {
+  background: #00cc52;
+  border-color: #00cc52;
+  box-shadow: 0 0 18px rgba(0, 255, 102, 0.6);
+  transform: translateX(6px);
+}
+
+.menu-secondary-btn {
+  background: rgba(0, 25, 5, 0.5);
+  border: 1.5px solid rgba(0, 255, 102, 0.4);
+  color: #00ff66;
+  text-shadow: 0 0 3px rgba(0, 255, 102, 0.6);
+}
+
+.menu-secondary-btn:hover {
+  background: rgba(0, 255, 102, 0.15);
+  border-color: #00ff66;
+  box-shadow: 0 0 12px rgba(0, 255, 102, 0.4);
+  transform: translateX(6px);
+}
+
+.menu-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: #4a5568;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  padding-top: 15px;
+}
+
 /* Flight HUD Interface */
 #hud-overlay {
   position: absolute;
@@ -111,7 +219,7 @@ html, body {
 }
 
 #menu-toggle-btn:hover {
-  background: rgba(0, 25, 102, 0.2);
+  background: rgba(0, 255, 102, 0.2);
   box-shadow: 0 0 15px rgba(0, 255, 102, 0.5);
 }
 

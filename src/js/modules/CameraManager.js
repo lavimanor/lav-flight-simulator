@@ -4,9 +4,9 @@ export class CameraManager {
   constructor() {
     this.engine = null;
     this.aircraftManager = null;
-    this.currentMode = 'thirdPerson';
+    this.currentMode = 'menuOrbit'; // Initialized in orbit view on startup
 
-    // Offset coordinates (X: center, Y: 4m above fuselage, Z: 15m behind fuselage)
+    // Offset coordinates (X: center, Y: 4m above fuselage, Z: -15m behind fuselage)
     this.offset = new THREE.Vector3(0, 4, -15);
     
     this.lookAheadDistance = 6.0; // Focus target is projected 6 meters ahead of the aircraft nose
@@ -18,6 +18,9 @@ export class CameraManager {
     this.targetCameraPos = new THREE.Vector3();
     this.targetLookAt = new THREE.Vector3();
     this.currentLookAt = new THREE.Vector3();
+
+    // Pre-flight circular sweep orientation angles
+    this.orbitAngle = 0.0;
   }
 
   init(engine) {
@@ -38,6 +41,8 @@ export class CameraManager {
 
     if (this.currentMode === 'thirdPerson') {
       this.updateThirdPersonFollow(aircraft, camera, deltaTime);
+    } else if (this.currentMode === 'menuOrbit') {
+      this.updateMenuOrbit(aircraft, camera, deltaTime);
     }
   }
 
@@ -66,6 +71,34 @@ export class CameraManager {
       // Interpolate position and focus vectors smoothly
       camera.position.lerp(this.targetCameraPos, lerpFactor);
       this.currentLookAt.lerp(this.targetLookAt, lerpFactor);
+      camera.lookAt(this.currentLookAt);
+    }
+  }
+
+  updateMenuOrbit(aircraft, camera, deltaTime) {
+    // Slow orbital sweep around the stationary parked aircraft (0.15 rads per sec)
+    this.orbitAngle += 0.15 * deltaTime;
+    const orbitRadius = 14.0;
+    const orbitHeight = 2.8;
+
+    // Position coordinates calculated along orbit circle
+    this.targetCameraPos.set(
+      aircraft.position.x + Math.sin(this.orbitAngle) * orbitRadius,
+      aircraft.position.y + orbitHeight,
+      aircraft.position.z + Math.cos(this.orbitAngle) * orbitRadius
+    );
+
+    this.targetLookAt.copy(aircraft.position).add(new THREE.Vector3(0, 0.4, 0));
+
+    if (this.isFirstFrame) {
+      camera.position.copy(this.targetCameraPos);
+      this.currentLookAt.copy(this.targetLookAt);
+      camera.lookAt(this.currentLookAt);
+      this.isFirstFrame = false;
+    } else {
+      // Interpolate smoothly to current coordinates, permitting camera transitions when launching
+      camera.position.lerp(this.targetCameraPos, 8.0 * deltaTime);
+      this.currentLookAt.lerp(this.targetLookAt, 8.0 * deltaTime);
       camera.lookAt(this.currentLookAt);
     }
   }

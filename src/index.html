@@ -21,8 +21,26 @@
 
   <div id="canvas-container"></div>
   
+  <!-- Interactive Pre-Flight Main Menu Overlay -->
+  <div id="main-menu-overlay">
+    <div id="main-menu-content">
+      <h1 class="menu-brand">VIRTUAL FLIGHT</h1>
+      <p class="menu-tagline">ADVANCED DESKTOP FLIGHT DYNAMICS SIMULATOR</p>
+      
+      <div class="menu-main-actions">
+        <button id="menu-btn-fly" class="menu-primary-btn">▶ FLY NOW</button>
+        <button id="menu-btn-hangar" class="menu-secondary-btn">✈ HANGAR SELECTION</button>
+      </div>
+
+      <div class="menu-footer">
+        <span>ELECTRON CLIENT v1.0.0</span>
+        <span>DYNAMICS ENGINE ACTIVE</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Modern Flight HUD Overlay -->
-  <div id="hud-overlay">
+  <div id="hud-overlay" style="visibility: hidden;">
     
     <!-- Top Heading Indicator -->
     <div id="hud-heading-container" class="hud-box">
