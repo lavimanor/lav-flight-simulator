@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Desktop Flight Simulator</title>
+  <link rel="stylesheet" href="css/main.css">
+  <!-- Local Import Map enables loading npm modules locally without external CDNs or bundlers -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "../node_modules/three/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- Physiological Vision Overlays -->
+  <div id="hud-blackout-overlay" class="fade-overlay"></div>
+  <div id="hud-redout-overlay" class="fade-overlay"></div>
+
+  <div id="canvas-container"></div>
+  
+  <!-- Modern Flight HUD Overlay -->
+  <div id="hud-overlay">
+    
+    <!-- Top Heading Indicator -->
+    <div id="hud-heading-container" class="hud-box">
+      <div id="hud-heading-ticker">▼</div>
+      <div id="hud-heading-val">000°</div>
+      <div id="hud-heading-tape-view">
+        <div id="hud-heading-tape-scroll"></div>
+      </div>
+    </div>
+
+    <!-- Hangar Selection Overlay Toggle Trigger -->
+    <button id="menu-toggle-btn">✈ SELECT AIRCRAFT</button>
+
+    <!-- Left Airspeed Tape -->
+    <div id="hud-speed-container" class="hud-box">
+      <div class="hud-title">SPD</div>
+      <div class="hud-numerical-readout">
+        <span id="hud-speed-val">0</span> <span class="hud-unit">KTS</span>
+      </div>
+      <div class="tape-bar-indicator left-aligned"></div>
+    </div>
+
+    <!-- Right Altitude Tape -->
+    <div id="hud-altitude-container" class="hud-box">
+      <div class="hud-title">ALT</div>
+      <div class="hud-numerical-readout">
+        <span id="hud-altitude-val">0</span> <span class="hud-unit">FT</span>
+      </div>
+      <div class="tape-bar-indicator right-aligned"></div>
+    </div>
+
+    <!-- Flashing Center Warnings Panel -->
+    <div id="hud-warnings-panel">
+      <!-- Engine toggles & Speedbrake HUD alerts -->
+      <div id="hud-engine-warning" class="hud-alert-box engine-off">ENG SHUTDOWN - PRESS 'I' TO IGNITE</div>
+      <div id="hud-airbrakes-warning" class="hud-alert-box airbrakes hidden">AIRBRAKES ACTIVE</div>
+      <div id="hud-ab-warning" class="hud-alert-box afterburner hidden">AFTERBURNER WET</div>
+
+      <div id="hud-stall-warning" class="hud-alert-box hidden">STALL</div>
+      <div id="hud-spin-warning" class="hud-alert-box hidden">SPIN ENTRY</div>
+      <div id="hud-brakes-warning" class="hud-alert-box brakes hidden">BRAKES ON</div>
+      <div id="hud-scrape-warning" class="hud-alert-box scrape hidden">BELLY SCRAPE</div>
+      <!-- Flashing Crash recovery HUD prompt -->
+      <div id="hud-crash-warning" class="hud-alert-box crash hidden">
+        <h2>** CRASHED **</h2>
+        <p>PRESS 'R' TO RESPAWN ON RUNWAY</p>
+      </div>
+    </div>
+
+    <!-- Center Pitch & Roll Ladder Reticle -->
+    <div id="hud-center-sight">
+      <div id="hud-aircraft-sight">
+        <span class="left-wing"></span>
+        <span class="center-dot"></span>
+        <span class="right-wing"></span>
+      </div>
+      <div id="hud-pitch-ladder"></div>
+    </div>
+
+    <!-- Bottom Flight Data Panel -->
+    <div id="hud-data-panel" class="hud-box">
+      <div class="hud-row">
+        <span class="label">THR</span>
+        <div class="bar-container">
+          <div id="hud-throttle-bar"></div>
+        </div>
+        <span id="hud-throttle-val" class="value">0%</span>
+      </div>
+      <div class="hud-row">
+        <span class="label">RPM</span>
+        <span id="hud-rpm-val" class="value">0</span>
+      </div>
+      <div class="hud-row">
+        <span class="label">V/S</span>
+        <span id="hud-vs-val" class="value">0 FPM</span>
+      </div>
+      
+      <!-- Takeoff / Landing configuration indicators -->
+      <div class="hud-row advanced-row">
+        <span class="label">GEAR</span>
+        <span id="hud-gear-val" class="value">DN</span>
+      </div>
+      <div class="hud-row">
+        <span class="label">FLAPS</span>
+        <span id="hud-flaps-val" class="value">0%</span>
+      </div>
+
+      <!-- Advanced Systems Telemetry -->
+      <div class="hud-row advanced-row">
+        <span class="label">FUEL</span>
+        <span id="hud-fuel-val" class="value">0 kg</span>
+      </div>
+      <div class="hud-row">
+        <span class="label">G-LOAD</span>
+        <span id="hud-gforce-val" class="value">1.0 G</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Interactive Hangar Selection Modal -->
+  <div id="hud-menu-modal" class="hidden">
+    <div id="hud-menu-content">
+      <h2>Hangar Selection</h2>
+      
+      <div class="aircraft-cards-container">
+        <!-- Aircraft Card 1: Trainer -->
+        <div class="aircraft-card selected" data-id="trainer">
+          <div class="card-title">T-1 Basic Trainer</div>
+          <p class="description">A standard single-engine civilian propeller aircraft. Highly stable, forgiving, and ideal for introductory flight practice.</p>
+          <div class="specs">
+            <div><span>Weight:</span> 1,100 kg</div>
+            <div><span>Max Thrust:</span> 4.5 kN</div>
+            <div><span>Roll Rate:</span> 1.5 rad/s</div>
+          </div>
+        </div>
+
+        <!-- Aircraft Card 2: Fighter -->
+        <div class="aircraft-card" data-id="fighter">
+          <div class="card-title">F-18 Strike Fighter</div>
+          <p class="description">A twin-engine, multirole military supersonic jet. Capable of extreme roll speeds, climbs, and tactical air maneuvering.</p>
+          <div class="specs">
+            <div><span>Weight:</span> 9,500 kg</div>
+            <div><span>Max Thrust:</span> 85.0 kN</div>
+            <div><span>Roll Rate:</span> 3.0 rad/s</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Weather Configuration Selection -->
+      <div id="menu-weather-section">
+        <h3>Weather Conditions</h3>
+        <div class="weather-selector-row">
+          <button class="weather-btn selected" data-weather="clear">☼ CLEAR & CALM</button>
+          <button class="weather-btn" data-weather="windy">☁ GUSTY WIND</button>
+          <button class="weather-btn" data-weather="stormy">⛈ SEVERE STORM</button>
+        </div>
+      </div>
+
+      <div class="menu-action-row">
+        <button id="menu-spawn-btn">SPAWN AIRCRAFT</button>
+        <button id="menu-close-btn">CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

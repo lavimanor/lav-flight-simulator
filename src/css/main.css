@@ -1,0 +1,650 @@
+/* Screen Reset and Layout Setup */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #0c0f12;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+}
+
+/* 0. Physiological Vision Screen overlays */
+.fade-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+#hud-blackout-overlay {
+  background-color: #000000;
+}
+
+#hud-redout-overlay {
+  background-color: #ff0000;
+  mix-blend-mode: multiply;
+}
+
+#canvas-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+/* Flight HUD Interface */
+#hud-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+  color: #00ff66;
+  font-family: Consolas, "Courier New", monospace;
+  text-shadow: 0 0 3px rgba(0, 255, 102, 0.6);
+  font-size: 14px;
+}
+
+/* Generic HUD component panel container styles */
+.hud-box {
+  background: rgba(0, 30, 10, 0.25);
+  border: 1.5px solid rgba(0, 255, 102, 0.4);
+  border-radius: 4px;
+  backdrop-filter: blur(2px);
+  position: absolute;
+}
+
+.hud-title {
+  font-size: 11px;
+  text-align: center;
+  border-bottom: 1.5px solid rgba(0, 255, 102, 0.4);
+  padding: 2px 0;
+  letter-spacing: 0.1em;
+}
+
+.hud-numerical-readout {
+  font-size: 22px;
+  font-weight: bold;
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.hud-unit {
+  font-size: 11px;
+  font-weight: normal;
+  opacity: 0.8;
+}
+
+/* Hangar Menu Toggle Button Trigger */
+#menu-toggle-btn {
+  position: absolute;
+  top: 25px;
+  right: 40px;
+  z-index: 15;
+  pointer-events: auto; 
+  background: rgba(0, 25, 5, 0.7);
+  border: 1.5px solid #00ff66;
+  color: #00ff66;
+  padding: 10px 16px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-family: Consolas, "Courier New", monospace;
+  cursor: pointer;
+  text-shadow: 0 0 3px rgba(0, 255, 102, 0.6);
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+  transition: all 0.2s ease;
+}
+
+#menu-toggle-btn:hover {
+  background: rgba(0, 255, 102, 0.2);
+  box-shadow: 0 0 15px rgba(0, 255, 102, 0.5);
+}
+
+/* 1. Top Heading Indicator */
+#hud-heading-container {
+  top: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+  height: 62px;
+  text-align: center;
+}
+
+#hud-heading-ticker {
+  font-size: 10px;
+  margin-top: 1px;
+}
+
+#hud-heading-val {
+  font-size: 18px;
+  font-weight: bold;
+  margin-top: -1px;
+}
+
+#hud-heading-tape-view {
+  width: 100%;
+  height: 20px;
+  overflow: hidden;
+  position: relative;
+  border-top: 1px dashed rgba(0, 255, 102, 0.3);
+}
+
+#hud-heading-tape-scroll {
+  width: 720px; 
+  height: 100%;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 19px,
+    rgba(0, 255, 102, 0.6) 20px
+  );
+  position: absolute;
+  left: 50%;
+  margin-left: -360px; 
+  transition: transform 0.05s linear;
+}
+
+/* 2. Left Speed Tape Panel */
+#hud-speed-container {
+  top: 50%;
+  left: 40px;
+  transform: translateY(-50%);
+  width: 110px;
+}
+
+.tape-bar-indicator {
+  height: 110px;
+  width: 4px;
+  background: rgba(0, 255, 102, 0.2);
+}
+.tape-bar-indicator.left-aligned {
+  float: right;
+  border-left: 1.5px dashed rgba(0, 255, 102, 0.4);
+}
+
+/* 3. Right Altitude Tape Panel */
+#hud-altitude-container {
+  top: 50%;
+  right: 40px;
+  transform: translateY(-50%);
+  width: 110px;
+}
+
+.tape-bar-indicator.right-aligned {
+  float: left;
+  border-right: 1.5px dashed rgba(0, 255, 102, 0.4);
+}
+
+/* Center Warnings Display Panel */
+#hud-warnings-panel {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 14;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hud-alert-box {
+  background: rgba(40, 0, 0, 0.65);
+  border: 2px solid #ff2222;
+  color: #ff3333;
+  font-weight: bold;
+  font-size: 24px;
+  padding: 8px 20px;
+  border-radius: 4px;
+  letter-spacing: 0.1em;
+  box-shadow: 0 0 15px rgba(255, 30, 30, 0.4);
+  animation: hudFlash 0.6s infinite alternate;
+}
+
+.hud-alert-box.engine-off {
+  background: rgba(40, 0, 0, 0.7);
+  border-color: #ff3333;
+  color: #ff3333;
+  box-shadow: 0 0 15px rgba(255, 30, 30, 0.5);
+  font-size: 16px;
+  padding: 10px 24px;
+}
+
+.hud-alert-box.airbrakes {
+  background: rgba(0, 30, 45, 0.65);
+  border-color: #00e1ff;
+  color: #00e1ff;
+  box-shadow: 0 0 15px rgba(0, 225, 255, 0.4);
+  font-size: 16px;
+  padding: 8px 20px;
+}
+
+.hud-alert-box.afterburner {
+  background: rgba(40, 15, 0, 0.7);
+  border-color: #ff5d00;
+  color: #ff5d00;
+  box-shadow: 0 0 15px rgba(255, 93, 0, 0.5);
+  font-size: 18px;
+  padding: 10px 24px;
+}
+
+.hud-alert-box.brakes {
+  background: rgba(0, 30, 40, 0.6);
+  border-color: #00e1ff;
+  color: #00e1ff;
+  box-shadow: 0 0 15px rgba(0, 225, 255, 0.3);
+}
+
+.hud-alert-box.scrape {
+  background: rgba(40, 20, 0, 0.7);
+  border-color: #ffaa00;
+  color: #ffaa00;
+  box-shadow: 0 0 15px rgba(255, 170, 0, 0.4);
+}
+
+.hud-alert-box.crash {
+  background: rgba(30, 0, 0, 0.82);
+  border-color: #ff1111;
+  color: #ff1111;
+  box-shadow: 0 0 25px rgba(255, 17, 17, 0.7);
+  padding: 24px 40px;
+}
+
+.hud-alert-box.crash h2 {
+  font-size: 28px;
+  margin-bottom: 8px;
+  letter-spacing: 0.15em;
+  color: #ff1111;
+  text-shadow: 0 0 8px rgba(255, 17, 17, 0.6);
+}
+
+.hud-alert-box.crash p {
+  font-size: 13px;
+  color: #ffffff;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+.hud-alert-box.hidden {
+  display: none !important;
+}
+
+@keyframes hudFlash {
+  from { opacity: 0.3; }
+  to { opacity: 1.0; }
+}
+
+/* 4. Center Sight & Pitch Ladder */
+#hud-center-sight {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 400px;
+  overflow: hidden; 
+}
+
+#hud-aircraft-sight {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 12;
+}
+
+#hud-aircraft-sight .center-dot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  background-color: #00ff66;
+  border-radius: 50%;
+  box-shadow: 0 0 4px #00ff66;
+}
+
+#hud-aircraft-sight .left-wing, 
+#hud-aircraft-sight .right-wing {
+  position: absolute;
+  top: 2px;
+  width: 25px;
+  height: 2px;
+  background-color: #00ff66;
+}
+
+#hud-aircraft-sight .left-wing { right: 12px; }
+#hud-aircraft-sight .right-wing { left: 12px; }
+
+/* Dynamic Pitch Ladder / Horizon Reference */
+#hud-pitch-ladder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 11;
+  transition: transform 0.05s linear;
+}
+
+.pitch-line {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 2px;
+  width: 100px;
+}
+
+.pitch-line.horizon {
+  width: 160px;
+  background-color: #00ff66;
+  height: 3px;
+  box-shadow: 0 0 4px rgba(0, 255, 102, 0.8);
+}
+
+.pitch-line.positive {
+  background-color: #00ff66;
+}
+.pitch-line.positive::before,
+.pitch-line.positive::after {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 8px;
+  background-color: #00ff66;
+  bottom: -8px; 
+}
+.pitch-line.positive::before { left: 0; }
+.pitch-line.positive::after { right: 0; }
+
+.pitch-line.negative {
+  background: repeating-linear-gradient(
+    90deg,
+    #00ff66,
+    #00ff66 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+.pitch-line.negative::before,
+.pitch-line.negative::after {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 8px;
+  background-color: #00ff66;
+  top: -8px; 
+}
+.pitch-line.negative::before { left: 0; }
+.pitch-line.negative::after { right: 0; }
+
+.pitch-line span {
+  position: absolute;
+  font-size: 10px;
+  top: -6px;
+  font-weight: bold;
+}
+.pitch-line span:first-child { left: -24px; }
+.pitch-line span:last-child { right: -24px; }
+
+/* 5. Bottom Instrument Panel */
+#hud-data-panel {
+  bottom: 25px;
+  left: 40px;
+  width: 260px;
+  padding: 12px;
+}
+
+.hud-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.hud-row:last-child {
+  margin-bottom: 0;
+}
+
+.hud-row .label {
+  font-size: 11px;
+  font-weight: bold;
+  width: 40px;
+}
+
+.hud-row .value {
+  font-size: 15px;
+  font-weight: bold;
+  text-align: right;
+  width: 90px; 
+}
+
+.hud-row .bar-container {
+  flex-grow: 1;
+  height: 8px;
+  background-color: rgba(0, 255, 102, 0.15);
+  border: 1px solid rgba(0, 255, 102, 0.4);
+  border-radius: 2px;
+  margin: 0 10px;
+  overflow: hidden;
+}
+
+#hud-throttle-bar {
+  height: 100%;
+  background-color: #00ff66;
+  box-shadow: 0 0 6px #00ff66;
+  width: 0%;
+  transition: width 0.1s linear;
+}
+
+.advanced-row {
+  border-top: 1px dashed rgba(0, 255, 102, 0.15);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+/* Selection Hangar Modal Styles */
+#hud-menu-modal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(10, 15, 20, 0.82);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(12px);
+  pointer-events: auto; 
+}
+
+#hud-menu-modal.hidden {
+  display: none !important;
+}
+
+#hud-menu-content {
+  background: #0f141c;
+  border: 2px solid #00ff66;
+  border-radius: 8px;
+  width: 640px;
+  padding: 30px;
+  color: #ffffff;
+  box-shadow: 0 10px 40px rgba(0, 255, 102, 0.15);
+  font-family: Consolas, "Courier New", monospace;
+}
+
+#hud-menu-content h2 {
+  font-size: 1.6rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(0, 255, 102, 0.3);
+  padding-bottom: 12px;
+  color: #00ff66;
+  text-shadow: 0 0 4px rgba(0, 255, 102, 0.4);
+  margin-bottom: 20px;
+}
+
+.aircraft-cards-container {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.aircraft-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.aircraft-card:hover {
+  background: rgba(0, 255, 102, 0.03);
+  border-color: rgba(0, 255, 102, 0.4);
+  color: #ffffff;
+}
+
+.aircraft-card.selected {
+  background: rgba(0, 255, 102, 0.06);
+  border-color: #00ff66;
+  color: #00ff66;
+  box-shadow: 0 0 12px rgba(0, 255, 102, 0.15);
+}
+
+.aircraft-card .card-title {
+  font-size: 1.15rem;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 10px;
+}
+.aircraft-card.selected .card-title {
+  color: #00ff66;
+  text-shadow: 0 0 3px rgba(0, 255, 102, 0.3);
+}
+
+.aircraft-card .description {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #a0aec0;
+  margin-bottom: 15px;
+  height: 55px;
+  overflow: hidden;
+}
+
+.aircraft-card .specs {
+  font-size: 11px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+}
+
+.aircraft-card .specs div {
+  margin-bottom: 4px;
+}
+
+.aircraft-card .specs div span {
+  font-weight: bold;
+  color: #00ff66;
+  margin-right: 4px;
+}
+
+/* Weather Environment Selector Styles */
+#menu-weather-section {
+  border-top: 1px dashed rgba(0, 255, 102, 0.25);
+  margin-bottom: 30px;
+  padding-top: 16px;
+}
+
+#menu-weather-section h3 {
+  font-size: 1rem;
+  text-transform: uppercase;
+  color: #00ff66;
+  margin-bottom: 12px;
+}
+
+.weather-selector-row {
+  display: flex;
+  gap: 15px;
+}
+
+.weather-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  color: #a0aec0;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: Consolas, "Courier New", monospace;
+  font-weight: bold;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.weather-btn:hover {
+  background: rgba(0, 255, 102, 0.03);
+  border-color: rgba(0, 255, 102, 0.4);
+  color: #ffffff;
+}
+
+.weather-btn.selected {
+  background: rgba(0, 255, 102, 0.08);
+  border-color: #00ff66;
+  color: #00ff66;
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+}
+
+.menu-action-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+}
+
+.menu-action-row button {
+  font-family: Consolas, "Courier New", monospace;
+  font-weight: bold;
+  padding: 10px 24px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#menu-spawn-btn {
+  background: #00ff66;
+  border: 1px solid #00ff66;
+  color: #0c0f12;
+}
+
+#menu-spawn-btn:hover {
+  background: #00cc52;
+  border-color: #00cc52;
+  box-shadow: 0 0 12px rgba(0, 255, 102, 0.4);
+}
+
+#menu-close-btn {
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+#menu-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #ffffff;
+}

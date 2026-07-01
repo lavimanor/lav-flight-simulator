@@ -1,0 +1,17 @@
+{
+  "name": "desktop-flight-simulator",
+  "version": "1.0.0",
+  "description": "A desktop flight simulator using Electron, HTML, CSS, JavaScript, and Three.js.",
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^42.0.0"
+  },
+  "dependencies": {
+    "three": "^0.184.0"
+  },
+  "private": true
+}
