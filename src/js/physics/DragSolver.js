@@ -7,10 +7,11 @@ export class DragSolver {
    * @param {AircraftBase} aircraft 
    * @param {number} airDensity 
    * @param {number} aoaRad
+   * @param {number} speedOfSound
    * @param {number} dt 
    * @returns {number} Total drag force (Newtons)
    */
-  static solve(aircraft, airDensity, aoaRad, dt) {
+  static solve(aircraft, airDensity, aoaRad, speedOfSound, dt) {
     const config = aircraft.config;
 
     // Flaps configuration drag adjustments
@@ -35,8 +36,17 @@ export class DragSolver {
     const CL = Aerodynamics.getLiftCoefficient(aoaRad, config.liftCoefficientMax);
     const CD = Aerodynamics.getDragCoefficient(CL, config.dragCoefficientZero, config.aspectRatio);
 
+    // Compressibility Wave Drag coefficient rise (sound barrier wave resistance centered near Mach 1.05)
+    let waveDragCD = 0.0;
+    const machNumber = aircraft.airspeed / speedOfSound;
+    if (config.id === 'fighter' && machNumber > 0.8) {
+      // Bell curve representing transonic wave drag peak
+      const transonicPeak = Math.exp(-Math.pow(machNumber - 1.05, 2) / 0.02);
+      waveDragCD = 0.065 * transonicPeak;
+    }
+
     // Combined drag profile scaling
-    const compositeCD = CD * flapsDragMultiplier * gearDragMultiplier * airbrakeCDMultiplier;
+    const compositeCD = (CD + waveDragCD) * flapsDragMultiplier * gearDragMultiplier * airbrakeCDMultiplier;
 
     // Dynamic Pressure: Q = 0.5 * rho * V^2
     const dynamicPressure = 0.5 * airDensity * aircraft.airspeed * aircraft.airspeed;

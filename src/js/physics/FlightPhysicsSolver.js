@@ -41,6 +41,7 @@ export class FlightPhysicsSolver {
 
     aircraft.altitude = aircraft.position.y;
     const airDensity = Atmosphere.getDensity(aircraft.position.y);
+    const speedOfSound = Atmosphere.getSpeedOfSound(aircraft.position.y);
 
     // Resolve procedural terrain elevation underneath aircraft coordinates
     const terrainHeight = this.getTerrainHeightAt(aircraft.position.x, aircraft.position.z);
@@ -72,8 +73,8 @@ export class FlightPhysicsSolver {
     // 1. Solve Propulsion System (Modular Engine/Fuel/Thrust solver)
     const thrustForceMagnitude = PropulsionSolver.solve(aircraft, airDensity, dt);
 
-    // 2. Solve Aerodynamic Drag (Modular Drag solver)
-    const dragForceMagnitude = DragSolver.solve(aircraft, airDensity, aoaRad, dt);
+    // 2. Solve Aerodynamic Drag (Modular Drag solver utilizing unified local Speed of Sound)
+    const dragForceMagnitude = DragSolver.solve(aircraft, airDensity, aoaRad, speedOfSound, dt);
 
     // Solve the gravity acceleration vector along the flight path (Pitch-up decelerates, pitch-down accelerates)
     const gravityAcceleration = -9.81 * forwardVector.y;
@@ -174,6 +175,10 @@ export class FlightPhysicsSolver {
     aircraft.isStalled = (aircraft.indicatedAirspeed < stallSpeed) && (aircraft.position.y > terrainHeight + 2.0);
 
     if (aircraft.isStalled) {
+      // Heavy nose-down pitching torque caused by zero support from stalled wings
+      const stallNoseDropMoment = 0.8 * dt; 
+      aircraft.angularVelocity.x += stallNoseDropMoment;
+
       aircraft.angularVelocity.x += (Math.random() - 0.5) * 0.15;
       aircraft.angularVelocity.z += (Math.random() - 0.5) * 0.15;
       
@@ -188,7 +193,7 @@ export class FlightPhysicsSolver {
     // Solve rotational physics controls with aerodynamic rotational damping
     const controlEffectiveness = (aircraft.isStalled || onGround) ? 0.08 : Math.min(aircraft.airspeed / 15.0, 1.2); 
 
-    // Smoothly interpolate control stick deflections to add rotational inertia (removes snap rotation jitter)
+    // Smoothly interpolate control stick deflections to add rotational inertia
     aircraft.controls.pitchSmoothed = THREE.MathUtils.lerp(aircraft.controls.pitchSmoothed || 0, aircraft.controls.pitch, 8.0 * dt);
     aircraft.controls.rollSmoothed = THREE.MathUtils.lerp(aircraft.controls.rollSmoothed || 0, aircraft.controls.roll, 8.0 * dt);
     aircraft.controls.yawSmoothed = THREE.MathUtils.lerp(aircraft.controls.yawSmoothed || 0, aircraft.controls.yaw, 8.0 * dt);
@@ -208,13 +213,21 @@ export class FlightPhysicsSolver {
       }
     }
 
+    // Transonic Mach Tuck pitching moment (nose-down tendency around Mach 0.90 - 1.25 due to backward shift in center of lift)
+    let machTuckMoment = 0.0;
+    const machNumber = aircraft.airspeed / speedOfSound;
+    if (config.id === 'fighter' && machNumber > 0.90 && machNumber < 1.25) {
+      const tuckFactor = Math.sin((machNumber - 0.90) * Math.PI / 0.35); // Sine peak centered near Mach 1.075
+      machTuckMoment = 0.32 * tuckFactor * dt; 
+    }
+
     // Aerodynamic angular velocity damping (resists rapid rotative turns based on airspeed & air density)
     const densityRatio = airDensity / 1.225;
     const speedRatio = Math.min(aircraft.airspeed / 20.0, 1.2);
     const rotationalDamping = 1.5 * densityRatio * speedRatio; // Damping increases at higher speed/density
     
-    // Apply smooth rotative momentum dampening
-    aircraft.angularVelocity.x = THREE.MathUtils.lerp(aircraft.angularVelocity.x, pitchVelocity, (6.0 + rotationalDamping) * dt);
+    // Apply smooth rotative momentum damping (incorporating transonic Mach Tuck pitching)
+    aircraft.angularVelocity.x = THREE.MathUtils.lerp(aircraft.angularVelocity.x, pitchVelocity + machTuckMoment, (6.0 + rotationalDamping) * dt);
     aircraft.angularVelocity.y = THREE.MathUtils.lerp(aircraft.angularVelocity.y, yawVelocity, (6.0 + rotationalDamping) * dt);
     aircraft.angularVelocity.z = THREE.MathUtils.lerp(aircraft.angularVelocity.z, rollVelocity, (6.0 + rotationalDamping) * dt);
 
