@@ -136,6 +136,7 @@ export class TerrainManager {
 
     const positions = geometry.attributes.position;
     const colors = [];
+    const waterLevel = 135.0; // Synced mean sea level
 
     for (let i = 0; i < positions.count; i++) {
       const vx = positions.getX(i) + chunkWorldX;
@@ -145,17 +146,23 @@ export class TerrainManager {
       const height = this.getHeightAt(vx, vz);
       positions.setY(i, height);
 
-      // Height coloring
+      // Procedural height-based color bands
       const color = new THREE.Color();
-      if (height < 150) {
-        const t = height / 150;
+      if (height < waterLevel + 4.0) {
+        // Sand beach coastline zone
+        color.setHex(0xd2b48c);
+      } else if (height < 210) {
+        // Lush green valleys
+        const t = (height - (waterLevel + 4.0)) / (210 - (waterLevel + 4.0));
         color.lerpColors(new THREE.Color(0x283e20), new THREE.Color(0x3e522b), t);
-      } else if (height < 450) {
-        const t = (height - 150) / 300;
+      } else if (height < 420) {
+        // Rocky mountain slopes
+        const t = (height - 210) / 210;
         color.lerpColors(new THREE.Color(0x3e522b), new THREE.Color(0x5c503b), t);
       } else {
-        const t = Math.min((height - 450) / 200, 1.0);
-        color.lerpColors(new THREE.Color(0x5c503b), new THREE.Color(0xf5f5f5), t);
+        // Snowy peaks
+        const t = Math.min((height - 420) / 180, 1.0);
+        color.lerpColors(new THREE.Color(0x5c503b), new THREE.Color(0xffffff), t);
       }
       colors.push(color.r, color.g, color.b);
     }
@@ -182,6 +189,7 @@ export class TerrainManager {
 
   /**
    * Resolves elevation height with flat Hermite-blended corridor flattening for the Runway (Plateau Y=180.0m)
+   * Incorporates a power-curve algorithm to sharpen peaks and flatten valleys.
    * @param {number} worldX 
    * @param {number} worldZ 
    * @returns {number} Height
@@ -189,7 +197,9 @@ export class TerrainManager {
   getHeightAt(worldX, worldZ) {
     const scale = this.noiseScale;
     const n = this.noise.fbm2D(worldX * scale, worldZ * scale, 4);
-    const rawHeight = n * this.maxElevation;
+
+    // Apply a power curve ratio to widen valley floors and sharpen peaks (thermodynamic ridge erosion)
+    const adjustedHeight = Math.pow(n, 1.4) * this.maxElevation;
 
     // Hermite-Smoothed Airport Corridor:
     // Blends terrain smoothly toward flat Y=180m airfield plateau.
@@ -203,9 +213,9 @@ export class TerrainManager {
         // Smooth transition over 520 meters
         const t = (distToCenter - 80) / 520;
         const smoothT = t * t * (3 - 2 * t);
-        return THREE.MathUtils.lerp(airfieldElevation, rawHeight, smoothT);
+        return THREE.MathUtils.lerp(airfieldElevation, adjustedHeight, smoothT);
       }
     }
-    return rawHeight;
+    return adjustedHeight;
   }
 }

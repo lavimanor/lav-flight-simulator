@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 export class MainMenuManager {
   constructor() {
     this.engine = null;
@@ -7,6 +9,7 @@ export class MainMenuManager {
     this.menuOverlay = null;
     this.btnFly = null;
     this.btnHangar = null;
+    this.btnMainMenuToggle = null;
   }
 
   init(engine) {
@@ -16,6 +19,7 @@ export class MainMenuManager {
     this.menuOverlay = document.getElementById('main-menu-overlay');
     this.btnFly = document.getElementById('menu-btn-fly');
     this.btnHangar = document.getElementById('menu-btn-hangar');
+    this.btnMainMenuToggle = document.getElementById('hud-btn-mainmenu');
 
     this.bindEvents();
     this.setupStartupState();
@@ -34,6 +38,10 @@ export class MainMenuManager {
           menuManager.openMenu();
         }
       });
+    }
+
+    if (this.btnMainMenuToggle) {
+      this.btnMainMenuToggle.addEventListener('click', () => this.showMenu());
     }
   }
 
@@ -78,6 +86,36 @@ export class MainMenuManager {
     }
 
     console.log(`[MainMenuManager] Pre-flight mode completed. Simulator launched into active chase view.`);
+  }
+
+  showMenu() {
+    this.isOpen = true;
+
+    // 1. Reveal pre-flight startup menu screen
+    if (this.menuOverlay) {
+      this.menuOverlay.classList.remove('hidden');
+    }
+
+    // 2. Hide in-flight flight systems HUD
+    const hudOverlay = document.getElementById('hud-overlay');
+    if (hudOverlay) {
+      hudOverlay.style.visibility = 'hidden';
+    }
+
+    // 3. Swap Camera mode back to Orbit View around aircraft
+    const cameraManager = this.engine.moduleManager.get('Camera');
+    if (cameraManager) {
+      cameraManager.currentMode = 'menuOrbit';
+      cameraManager.isFirstFrame = true;
+    }
+
+    // 4. Safely respawn / park aircraft back on the flat runway plateau coordinates
+    const aircraftManager = this.engine.moduleManager.get('Aircraft');
+    if (aircraftManager && aircraftManager.activeAircraft) {
+      aircraftManager.activeAircraft.spawn(this.engine.scene, new THREE.Vector3(0, 181.2, -500));
+    }
+
+    console.log(`[MainMenuManager] Returned to pre-flight menu. Reset aircraft on runway.`);
   }
 
   update(deltaTime) {

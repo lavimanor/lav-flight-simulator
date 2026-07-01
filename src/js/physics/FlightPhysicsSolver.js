@@ -47,6 +47,48 @@ export class FlightPhysicsSolver {
     const terrainHeight = this.getTerrainHeightAt(aircraft.position.x, aircraft.position.z);
     const groundClearance = terrainHeight + 1.2;
 
+    // 5. Water Surface Splashdown and Sinking Animation
+    const waterLevel = 135.0;
+    
+    if (aircraft.isSinking) {
+      // Sinking kinematics (fluid drag slows airspeed rapidly; nose pitches down into depth)
+      aircraft.airspeed = THREE.MathUtils.lerp(aircraft.airspeed, 0.0, 5.0 * dt);
+      aircraft.indicatedAirspeed = aircraft.airspeed;
+      aircraft.velocity.set(forwardVector.x * aircraft.airspeed, -2.5, forwardVector.z * aircraft.airspeed);
+      
+      aircraft.position.addScaledVector(aircraft.velocity, dt);
+
+      // Lock maximum sinking depth to 6 meters below sea level
+      if (aircraft.position.y < waterLevel - 6.0) {
+        aircraft.position.y = waterLevel - 6.0;
+        aircraft.velocity.set(0, 0, 0);
+
+        if (!aircraft.isCrashed) {
+          aircraft.isCrashed = true;
+          console.log(`[FlightPhysicsSolver] Splash down complete. Submersion crash triggered.`);
+        }
+      }
+
+      // Rotate nose downward slowly to simulate plunging
+      aircraft.group.rotateX(0.4 * dt);
+      aircraft.rotation.copy(aircraft.group.rotation);
+      aircraft.quaternion.copy(aircraft.group.quaternion);
+
+      // Force engine shutdown and wind turbine RPM deceleration
+      aircraft.engineOn = false;
+      aircraft.engineSpool = THREE.MathUtils.lerp(aircraft.engineSpool, 0.0, 5.0 * dt);
+
+      aircraft.group.position.copy(aircraft.position);
+      return;
+    }
+
+    // Trigger water splashdown sinking sequence when hitting the sea surface in flight
+    if (aircraft.position.y <= waterLevel + 0.1 && !aircraft.isCrashed) {
+      aircraft.isSinking = true;
+      console.log(`[FlightPhysicsSolver] WATER IMPACT - SINKING PHASE INITIATED`);
+      return;
+    }
+
     // Ground Effect: Cushion of air within one wing-span proximity to elevated terrain
     let geLiftMultiplier = 1.0;
     const wingSpan = config.dimensions.span;
@@ -139,7 +181,8 @@ export class FlightPhysicsSolver {
     if (aircraft.position.y <= groundClearance) {
       // Fetch sinking speed before clamp
       const preClampSinkingSpeed = aircraft.velocity.y;
-      const pitchAngleDeg = Math.abs(Math.asin(THREE.MathUtils.clamp(forwardVector.y, -1.0, 1.0)) * (180 / Math.PI));
+      const pitchAngleRadLocal = Math.asin(THREE.MathUtils.clamp(forwardVector.y, -1.0, 1.0));
+      const pitchAngleDeg = Math.abs(pitchAngleRadLocal * (180 / Math.PI));
 
       // CRASH DETECTION RESOLUTION
       const noseDiveImpact = pitchAngleDeg > 20.0;     // Nose first strike
@@ -268,7 +311,7 @@ export class FlightPhysicsSolver {
     const calculatedG = gravityContribution + pitchG + turnG;
     aircraft.gForce = THREE.MathUtils.lerp(aircraft.gForce || 1.0, calculatedG, 6.0 * dt);
 
-    // Smooth blackout/redout threshold tracking
+    // Smooth blackout/redout tracking
     if (aircraft.gForce > 3.8) {
       const deltaFactor = (aircraft.gForce - 3.8) / 3.7;
       aircraft.blackout = Math.min(aircraft.blackout + deltaFactor * dt * 0.4, 1.0);

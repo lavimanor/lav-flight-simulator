@@ -45,6 +45,7 @@ export class AircraftBase {
     this.isStalled = false;                  
     this.isSpinning = false;                 
     this.isCrashed = false;                  // Crash state register
+    this.isSinking = false;                  // Water splashdown sinking animation register
     this.spinDir = 1;                        
 
     // Takeoff/Landing gear & flaps registers
@@ -92,6 +93,7 @@ export class AircraftBase {
     this.isStalled = false;
     this.isSpinning = false;
     this.isCrashed = false; // Reset crash flag completely
+    this.isSinking = false; // Reset water sinking state completely
     this.isBellyScraping = false;
     this.brakePressure = 0.0;
     this.airbrakeDeployState = 0.0;

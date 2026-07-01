@@ -7,6 +7,7 @@ import { InputManager } from './modules/InputManager.js';
 import { HudManager } from './modules/HudManager.js';
 import { MenuManager } from './modules/MenuManager.js';
 import { MainMenuManager } from './modules/MainMenuManager.js';
+import { WaterManager } from './modules/WaterManager.js';
 import { TerrainManager } from './modules/TerrainManager.js';
 import { WeatherManager } from './modules/WeatherManager.js';
 
@@ -57,10 +58,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainMenuManager = new MainMenuManager();
     moduleManager.register('MainMenu', mainMenuManager);
 
+    // 12. Register the Procedural Water Simulation Module
+    const waterManager = new WaterManager();
+    moduleManager.register('Water', waterManager);
+
     // Initialize all modules sequentially
     moduleManager.initAll();
 
-    // 12. Start the global simulation rendering ticking loop
+    // 13. Start the global simulation rendering ticking loop
     engine.start();
 
   } catch (error) {

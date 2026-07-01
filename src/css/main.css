@@ -52,8 +52,8 @@ html, body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, rgba(8, 12, 16, 0.9) 0%, rgba(12, 20, 24, 0.6) 100%);
-  z-index: 90;
+  z-index: 15;
+  background: rgba(10, 15, 20, 0.7);
   display: flex;
   align-items: center;
   padding-left: 8%;
@@ -137,23 +137,18 @@ html, body {
 }
 
 .menu-secondary-btn:hover {
-  background: rgba(0, 255, 102, 0.15);
+  background: rgba(0, 25, 102, 0.15);
   border-color: #00ff66;
   box-shadow: 0 0 12px rgba(0, 255, 102, 0.4);
   transform: translateX(6px);
 }
 
 .menu-footer {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  color: #4a5568;
-  border-top: 1px dashed rgba(255, 255, 255, 0.1);
-  padding-top: 15px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
 }
 
-/* Flight HUD Interface */
+/* Active HUD Interface Overlays */
 #hud-overlay {
   position: absolute;
   top: 0;
@@ -198,7 +193,7 @@ html, body {
   opacity: 0.8;
 }
 
-/* Hangar Menu Toggle Button Trigger */
+/* Action Control Buttons */
 #menu-toggle-btn {
   position: absolute;
   top: 25px;
@@ -219,7 +214,31 @@ html, body {
 }
 
 #menu-toggle-btn:hover {
-  background: rgba(0, 255, 102, 0.2);
+  background: rgba(0, 25, 102, 0.2);
+  box-shadow: 0 0 15px rgba(0, 255, 102, 0.5);
+}
+
+#hud-btn-mainmenu {
+  position: absolute;
+  top: 25px;
+  right: 230px; /* Shifted left of the Select Aircraft toggle button */
+  z-index: 15;
+  pointer-events: auto; 
+  background: rgba(0, 25, 5, 0.7);
+  border: 1.5px solid #00ff66;
+  color: #00ff66;
+  padding: 10px 16px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-family: Consolas, "Courier New", monospace;
+  cursor: pointer;
+  text-shadow: 0 0 3px rgba(0, 255, 102, 0.6);
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+  transition: all 0.2s ease;
+}
+
+#hud-btn-mainmenu:hover {
+  background: rgba(0, 25, 102, 0.2);
   box-shadow: 0 0 15px rgba(0, 255, 102, 0.5);
 }
 
