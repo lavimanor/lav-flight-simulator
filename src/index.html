@@ -79,6 +79,34 @@
         <span class="center-dot"></span>
         <span class="right-wing"></span>
       </div>
+      
+      <!-- Modular Flight Path Vector (FPV) Reticle -->
+      <div id="hud-fpv" class="hud-fpv-reticle">
+        <span class="top-fin"></span>
+      </div>
+
+      <!-- Instrument Landing System (ILS) Indicator Grid -->
+      <div id="hud-ils-container" class="hidden">
+        <!-- Glideslope scale (vertical approach deviation) -->
+        <div class="ils-vertical-scale">
+          <span class="dot">·</span>
+          <span class="dot">·</span>
+          <span class="center-dash">-</span>
+          <span class="dot">·</span>
+          <span class="dot">·</span>
+          <div id="hud-ils-glideslope"></div>
+        </div>
+        <!-- Localizer scale (horizontal centerline deviation) -->
+        <div class="ils-horizontal-scale">
+          <span class="dot">·</span>
+          <span class="dot">·</span>
+          <span class="center-dash">|</span>
+          <span class="dot">·</span>
+          <span class="dot">·</span>
+          <div id="hud-ils-localizer"></div>
+        </div>
+      </div>
+
       <div id="hud-pitch-ladder"></div>
     </div>
 
