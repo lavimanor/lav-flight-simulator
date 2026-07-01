@@ -1,5 +1,6 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const { buildAudioAssets } = require('./scripts/sound-builder.js');
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -21,6 +22,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Build and verify audio placeholder WAV directories on boot
+  buildAudioAssets();
   createWindow();
 
   app.on('activate', () => {

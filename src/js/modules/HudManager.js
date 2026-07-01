@@ -203,11 +203,14 @@ export class HudManager {
         }
 
         // Physiological Vision Overlays Opacities
+        const settings = this.engine.moduleManager.get('Settings');
+        const gEffectsActive = settings ? settings.enableGEffects : true;
+
         if (this.blackoutOverlay) {
-          this.blackoutOverlay.style.opacity = aircraft.blackout;
+          this.blackoutOverlay.style.opacity = gEffectsActive ? aircraft.blackout : 0.0;
         }
         if (this.redoutOverlay) {
-          this.redoutOverlay.style.opacity = aircraft.redout;
+          this.redoutOverlay.style.opacity = gEffectsActive ? aircraft.redout : 0.0;
         }
 
         // Stall, Spin, and Crash Warnings Displays
@@ -289,11 +292,18 @@ export class HudManager {
         }
 
         // Update modular sub-components
+        const ilsActive = settings ? settings.enableILS : true;
+
         if (this.fpvComponent) {
           this.fpvComponent.update(aircraft, this.engine.camera);
         }
         if (this.ilsComponent) {
-          this.ilsComponent.update(aircraft);
+          if (ilsActive) {
+            this.ilsComponent.update(aircraft);
+          } else {
+            const ilsBox = document.getElementById('hud-ils-container');
+            if (ilsBox) ilsBox.classList.add('hidden');
+          }
         }
       }
     }

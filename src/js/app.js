@@ -10,6 +10,8 @@ import { MainMenuManager } from './modules/MainMenuManager.js';
 import { WaterManager } from './modules/WaterManager.js';
 import { TerrainManager } from './modules/TerrainManager.js';
 import { WeatherManager } from './modules/WeatherManager.js';
+import { SoundManager } from './modules/SoundManager.js';
+import { SettingsMenu } from './modules/ui/SettingsMenu.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   try {
@@ -62,10 +64,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const waterManager = new WaterManager();
     moduleManager.register('Water', waterManager);
 
+    // 13. Register the Spatial Audio Sound Manager Module
+    const soundManager = new SoundManager();
+    moduleManager.register('Sound', soundManager);
+
+    // 14. Register the Pilot Configuration Settings Menu Module
+    const settingsMenu = new SettingsMenu();
+    moduleManager.register('Settings', settingsMenu);
+
     // Initialize all modules sequentially
     moduleManager.initAll();
 
-    // 13. Start the global simulation rendering ticking loop
+    // 15. Start the global simulation rendering ticking loop
     engine.start();
 
   } catch (error) {

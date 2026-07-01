@@ -30,11 +30,72 @@
       <div class="menu-main-actions">
         <button id="menu-btn-fly" class="menu-primary-btn">▶ FLY NOW</button>
         <button id="menu-btn-hangar" class="menu-secondary-btn">✈ HANGAR SELECTION</button>
+        <button id="menu-btn-settings" class="menu-secondary-btn">⚙ PILOT CONFIGURATION</button>
       </div>
 
       <div class="menu-footer">
         <span>ELECTRON CLIENT v1.0.0</span>
         <span>DYNAMICS ENGINE ACTIVE</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Settings Dialog Modal -->
+  <div id="hud-settings-modal" class="hidden">
+    <div id="hud-settings-content">
+      <h2>Pilot Configuration</h2>
+      
+      <div class="settings-group">
+        <h3>Audio Channels</h3>
+        <div class="setting-row">
+          <label for="slider-master-vol">Master Volume</label>
+          <input type="range" id="slider-master-vol" min="0" max="1" step="0.05" value="0.8">
+          <span id="val-master-vol">80%</span>
+        </div>
+        <div class="setting-row">
+          <label for="slider-engine-vol">Engine Volume</label>
+          <input type="range" id="slider-engine-vol" min="0" max="1" step="0.05" value="0.7">
+          <span id="val-engine-vol">70%</span>
+        </div>
+        <div class="setting-row">
+          <label for="slider-wind-vol">Wind Volume</label>
+          <input type="range" id="slider-wind-vol" min="0" max="1" step="0.05" value="0.5">
+          <span id="val-wind-vol">50%</span>
+        </div>
+        <div class="setting-row">
+          <label for="slider-effects-vol">Effects Volume</label>
+          <input type="range" id="slider-effects-vol" min="0" max="1" step="0.05" value="0.6">
+          <span id="val-effects-vol" class="value-display">60%</span>
+        </div>
+        <div class="setting-row">
+          <label for="checkbox-mute-sound">Mute All Sounds</label>
+          <input type="checkbox" id="checkbox-mute-sound" style="width: auto; accent-color: #00ff66;">
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3>Simulation Parameters</h3>
+        <div class="setting-row">
+          <label for="checkbox-g-effects">Enable G-Effects (Blackout)</label>
+          <input type="checkbox" id="checkbox-g-effects" style="width: auto; accent-color: #00ff66;" checked>
+        </div>
+        <div class="setting-row">
+          <label for="checkbox-cam-shake">Enable Aerodynamic Buffet</label>
+          <input type="checkbox" id="checkbox-cam-shake" style="width: auto; accent-color: #00ff66;" checked>
+        </div>
+        <div class="setting-row">
+          <label for="checkbox-wind-effects">Enable Wind & Turbulence</label>
+          <input type="checkbox" id="checkbox-wind-effects" style="width: auto; accent-color: #00ff66;" checked>
+        </div>
+        <div class="setting-row">
+          <label for="checkbox-ils-display">Enable ILS Guidance</label>
+          <input type="checkbox" id="checkbox-ils-display" style="width: auto; accent-color: #00ff66;" checked>
+        </div>
+      </div>
+
+      <div class="menu-action-row">
+        <button id="settings-save-btn">SAVE CONFIG</button>
+        <button id="settings-close-btn">CANCEL</button>
       </div>
     </div>
   </div>
@@ -73,7 +134,7 @@
       <div class="tape-bar-indicator right-aligned"></div>
     </div>
 
-    <!-- Flashing Center Warnings Panel -->
+    <!-- Stacked Tactical Left Sidebar Warnings Panel -->
     <div id="hud-warnings-panel">
       <!-- Engine toggles & Speedbrake HUD alerts -->
       <div id="hud-engine-warning" class="hud-alert-box engine-off">ENG SHUTDOWN - PRESS 'I' TO IGNITE</div>
@@ -84,6 +145,10 @@
       <div id="hud-spin-warning" class="hud-alert-box hidden">SPIN ENTRY</div>
       <div id="hud-brakes-warning" class="hud-alert-box brakes hidden">BRAKES ON</div>
       <div id="hud-scrape-warning" class="hud-alert-box scrape hidden">BELLY SCRAPE</div>
+    </div>
+
+    <!-- Centered Emergency Crash Panel -->
+    <div id="hud-crash-panel">
       <!-- Flashing Crash recovery HUD prompt -->
       <div id="hud-crash-warning" class="hud-alert-box crash hidden">
         <h2>** CRASHED **</h2>
@@ -210,6 +275,7 @@
       </div>
 
       <div class="menu-action-row">
+        <button id="game-menu-settings-btn" class="menu-secondary-btn" style="margin-right: auto;">⚙ SETTINGS</button>
         <button id="menu-spawn-btn">SPAWN AIRCRAFT</button>
         <button id="menu-close-btn">CANCEL</button>
       </div>

@@ -35,9 +35,12 @@ export class FlightPhysicsSolver {
     const localUpVector = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraft.group.quaternion);
 
     // Resolve weather environment wind vector and dynamic turbulence gusts
+    const settings = aircraft.engine?.moduleManager?.get('Settings');
+    const windEnabled = settings ? settings.enableWind : true;
+
     const weatherManager = aircraft.engine?.moduleManager?.get('Weather');
-    const windVector = weatherManager ? weatherManager.wind : new THREE.Vector3(0, 0, 0);
-    const turbulenceVector = weatherManager ? weatherManager.currentGust : new THREE.Vector3(0, 0, 0);
+    const windVector = (weatherManager && windEnabled) ? weatherManager.wind : new THREE.Vector3(0, 0, 0);
+    const turbulenceVector = (weatherManager && windEnabled) ? weatherManager.currentGust : new THREE.Vector3(0, 0, 0);
 
     aircraft.altitude = aircraft.position.y;
     const airDensity = Atmosphere.getDensity(aircraft.position.y);

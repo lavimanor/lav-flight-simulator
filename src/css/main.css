@@ -148,6 +148,95 @@ html, body {
   color: rgba(255, 255, 255, 0.4);
 }
 
+/* Settings Configuration Modal Styles */
+#hud-settings-modal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(10, 15, 20, 0.82);
+  z-index: 105; /* Positioned above pre-flight main menu overlays */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+#hud-settings-modal.hidden {
+  display: none !important;
+}
+
+#hud-settings-content {
+  background: #0f141c;
+  border: 2px solid #00ff66;
+  border-radius: 8px;
+  width: 500px;
+  max-height: 90%;
+  overflow-y: auto;
+  padding: 30px;
+  color: #ffffff;
+  box-shadow: 0 10px 40px rgba(0, 255, 102, 0.15);
+  font-family: Consolas, "Courier New", monospace;
+  scrollbar-width: thin;
+  scrollbar-color: #00ff66 #0f141c;
+}
+
+#hud-settings-content h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(0, 255, 102, 0.3);
+  padding-bottom: 12px;
+  color: #00ff66;
+  text-shadow: 0 0 4px rgba(0, 255, 102, 0.4);
+  margin-bottom: 20px;
+}
+
+.settings-group {
+  margin-bottom: 30px;
+}
+
+.settings-group h3 {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a0aec0;
+  margin-bottom: 15px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
+  padding-bottom: 5px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.setting-row label {
+  font-size: 12px;
+  font-weight: bold;
+  width: 130px;
+}
+
+.setting-row input[type="range"] {
+  flex-grow: 1;
+  margin: 0 15px;
+  accent-color: #00ff66;
+  cursor: pointer;
+}
+
+.setting-row .value-display {
+  font-size: 12px;
+  font-weight: bold;
+  color: #00ff66;
+  width: 45px;
+  text-align: right;
+}
+
 /* Active HUD Interface Overlays */
 #hud-overlay {
   position: absolute;
@@ -209,7 +298,7 @@ html, body {
   font-family: Consolas, "Courier New", monospace;
   cursor: pointer;
   text-shadow: 0 0 3px rgba(0, 255, 102, 0.6);
-  box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+  box-shadow: 0 0 10px rgba(0, 25, 102, 0.2);
   transition: all 0.2s ease;
 }
 
@@ -232,8 +321,8 @@ html, body {
   font-weight: bold;
   font-family: Consolas, "Courier New", monospace;
   cursor: pointer;
-  text-shadow: 0 0 3px rgba(0, 255, 102, 0.6);
-  box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+  text-shadow: 0 0 3px rgba(0, 25, 102, 0.6);
+  box-shadow: 0 0 10px rgba(0, 25, 102, 0.2);
   transition: all 0.2s ease;
 }
 
@@ -317,71 +406,82 @@ html, body {
   border-right: 1.5px dashed rgba(0, 255, 102, 0.4);
 }
 
-/* Center Warnings Display Panel */
+/* Stacked Tactical Left Sidebar Warnings Panel */
 #hud-warnings-panel {
   position: absolute;
-  top: 22%;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 100px;
+  left: 40px;
   z-index: 14;
-  text-align: center;
+  text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  pointer-events: none;
+}
+
+/* Centered Emergency Crash Panel */
+#hud-crash-panel {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  text-align: center;
+  pointer-events: none;
 }
 
 .hud-alert-box {
   background: rgba(40, 0, 0, 0.65);
-  border: 2px solid #ff2222;
+  border: 1.5px solid #ff2222;
   color: #ff3333;
   font-weight: bold;
-  font-size: 24px;
-  padding: 8px 20px;
-  border-radius: 4px;
+  font-size: 13px; /* Slightly more compact for stacked sidebar */
+  padding: 6px 12px;
+  border-radius: 3px;
   letter-spacing: 0.1em;
-  box-shadow: 0 0 15px rgba(255, 30, 30, 0.4);
+  box-shadow: 0 0 10px rgba(255, 30, 30, 0.3);
   animation: hudFlash 0.6s infinite alternate;
+  width: fit-content;
 }
 
 .hud-alert-box.engine-off {
   background: rgba(40, 0, 0, 0.7);
   border-color: #ff3333;
   color: #ff3333;
-  box-shadow: 0 0 15px rgba(255, 30, 30, 0.5);
-  font-size: 16px;
-  padding: 10px 24px;
+  box-shadow: 0 0 10px rgba(255, 30, 30, 0.4);
+  font-size: 13px;
 }
 
 .hud-alert-box.airbrakes {
   background: rgba(0, 30, 45, 0.65);
   border-color: #00e1ff;
   color: #00e1ff;
-  box-shadow: 0 0 15px rgba(0, 225, 255, 0.4);
-  font-size: 16px;
-  padding: 8px 20px;
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+  font-size: 13px;
 }
 
 .hud-alert-box.afterburner {
   background: rgba(40, 15, 0, 0.7);
   border-color: #ff5d00;
   color: #ff5d00;
-  box-shadow: 0 0 15px rgba(255, 93, 0, 0.5);
-  font-size: 18px;
-  padding: 10px 24px;
+  box-shadow: 0 0 10px rgba(255, 93, 0, 0.4);
+  font-size: 13px;
 }
 
 .hud-alert-box.brakes {
   background: rgba(0, 30, 40, 0.6);
   border-color: #00e1ff;
   color: #00e1ff;
-  box-shadow: 0 0 15px rgba(0, 225, 255, 0.3);
+  box-shadow: 0 0 10px rgba(0, 225, 255, 0.25);
+  font-size: 13px;
 }
 
 .hud-alert-box.scrape {
   background: rgba(40, 20, 0, 0.7);
   border-color: #ffaa00;
   color: #ffaa00;
-  box-shadow: 0 0 15px rgba(255, 170, 0, 0.4);
+  box-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
+  font-size: 13px;
 }
 
 .hud-alert-box.crash {
@@ -390,6 +490,7 @@ html, body {
   color: #ff1111;
   box-shadow: 0 0 25px rgba(255, 17, 17, 0.7);
   padding: 24px 40px;
+  font-size: 14px;
 }
 
 .hud-alert-box.crash h2 {
@@ -760,16 +861,16 @@ html, body {
 }
 
 .aircraft-card:hover {
-  background: rgba(0, 255, 102, 0.03);
-  border-color: rgba(0, 255, 102, 0.4);
+  background: rgba(0, 25, 102, 0.03);
+  border-color: rgba(0, 25, 102, 0.4);
   color: #ffffff;
 }
 
 .aircraft-card.selected {
-  background: rgba(0, 255, 102, 0.06);
+  background: rgba(0, 25, 102, 0.06);
   border-color: #00ff66;
   color: #00ff66;
-  box-shadow: 0 0 12px rgba(0, 255, 102, 0.15);
+  box-shadow: 0 0 12px rgba(0, 25, 102, 0.15);
 }
 
 .aircraft-card .card-title {
@@ -780,7 +881,7 @@ html, body {
 }
 .aircraft-card.selected .card-title {
   color: #00ff66;
-  text-shadow: 0 0 3px rgba(0, 255, 102, 0.3);
+  text-shadow: 0 0 3px rgba(0, 25, 102, 0.3);
 }
 
 .aircraft-card .description {
@@ -810,7 +911,7 @@ html, body {
 
 /* Weather Environment Selector Styles */
 #menu-weather-section {
-  border-top: 1px dashed rgba(0, 255, 102, 0.25);
+  border-top: 1px dashed rgba(0, 25, 102, 0.25);
   margin-bottom: 30px;
   padding-top: 16px;
 }
@@ -842,16 +943,16 @@ html, body {
 }
 
 .weather-btn:hover {
-  background: rgba(0, 255, 102, 0.03);
-  border-color: rgba(0, 255, 102, 0.4);
+  background: rgba(0, 25, 102, 0.03);
+  border-color: rgba(0, 25, 102, 0.4);
   color: #ffffff;
 }
 
 .weather-btn.selected {
-  background: rgba(0, 255, 102, 0.08);
+  background: rgba(0, 25, 102, 0.08);
   border-color: #00ff66;
   color: #00ff66;
-  box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+  box-shadow: 0 0 10px rgba(0, 25, 102, 0.2);
 }
 
 .menu-action-row {
@@ -879,7 +980,7 @@ html, body {
 #menu-spawn-btn:hover {
   background: #00cc52;
   border-color: #00cc52;
-  box-shadow: 0 0 12px rgba(0, 255, 102, 0.4);
+  box-shadow: 0 0 12px rgba(0, 25, 102, 0.4);
 }
 
 #menu-close-btn {

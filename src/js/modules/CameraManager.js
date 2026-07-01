@@ -83,7 +83,9 @@ export class CameraManager {
       stallBuffet = (1.0 - Math.min(aircraft.indicatedAirspeed / (stallSpeed * 1.25), 1.0)) * 0.65;
     }
 
-    const totalBuffet = transonicBuffet + gBuffet + stallBuffet;
+    const settings = this.engine.moduleManager.get('Settings');
+    const buffetingActive = settings ? settings.enableCamShake : true;
+    const totalBuffet = buffetingActive ? (transonicBuffet + gBuffet + stallBuffet) : 0.0;
 
     // Generate procedural high-frequency vibration offsets
     const shakeOffset = new THREE.Vector3();

@@ -9,6 +9,7 @@ export class MainMenuManager {
     this.menuOverlay = null;
     this.btnFly = null;
     this.btnHangar = null;
+    this.btnSettings = null;
     this.btnMainMenuToggle = null;
   }
 
@@ -19,6 +20,7 @@ export class MainMenuManager {
     this.menuOverlay = document.getElementById('main-menu-overlay');
     this.btnFly = document.getElementById('menu-btn-fly');
     this.btnHangar = document.getElementById('menu-btn-hangar');
+    this.btnSettings = document.getElementById('menu-btn-settings');
     this.btnMainMenuToggle = document.getElementById('hud-btn-mainmenu');
 
     this.bindEvents();
@@ -36,6 +38,16 @@ export class MainMenuManager {
         const menuManager = this.engine.moduleManager.get('Menu');
         if (menuManager) {
           menuManager.openMenu();
+        }
+      });
+    }
+
+    if (this.btnSettings) {
+      this.btnSettings.addEventListener('click', () => {
+        // Trigger the Pilot Configuration Modal
+        const settingsMenu = this.engine.moduleManager.get('Settings');
+        if (settingsMenu) {
+          settingsMenu.openSettings();
         }
       });
     }
