@@ -21,6 +21,7 @@ export class TerrainManager {
   init(engine) {
     this.engine = engine;
     this.createRunway();
+    this.createRunwayLights();
   }
 
   createRunway() {
@@ -73,6 +74,131 @@ export class TerrainManager {
 
     scene.add(linesGroup);
     this.runwayGroup = linesGroup;
+  }
+
+  /**
+   * Generates highly optimized airfield lighting using point-clouds rendered in batch calls.
+   * Generates structural concrete support columns underneath any lights extending over water.
+   */
+  createRunwayLights() {
+    const scene = this.engine.scene;
+    
+    const edgePositions = [];
+    const greenPositions = [];
+    const redPositions = [];
+    const alsPositions = [];
+
+    const yPos = 180.12; // Placed slightly above asphalt runway surface
+
+    // 1. White Edge Lights (Z from -980 to 1980 in 40m intervals)
+    for (let z = -980; z <= 1980; z += 40) {
+      // Left edge lights (X = -30)
+      edgePositions.push(-30, yPos, z);
+      // Right edge lights (X = 30)
+      edgePositions.push(30, yPos, z);
+    }
+
+    // 2. Approach threshold green landing lights (Z = -980)
+    for (let x = -30; x <= 30; x += 6) {
+      greenPositions.push(x, yPos, -980);
+    }
+
+    // 3. Departure runway end red lights (Z = 1980)
+    for (let x = -30; x <= 30; x += 6) {
+      redPositions.push(x, yPos, 1980);
+    }
+
+    // Common standard material for structural support piers
+    const pillarMat = new THREE.MeshStandardMaterial({
+      color: 0x4a5568,         // Low-poly slate concrete column color
+      roughness: 0.82,
+      metalness: 0.10,
+      flatShading: true
+    });
+
+    // Helper to evaluate ground depth and procedurally build a structural light piling gantry
+    const checkAndBuildSupportPillar = (x, z) => {
+      const groundHeight = this.getHeightAt(x, z);
+      if (groundHeight < 179.5) {
+        const pillarHeight = 180.0 - groundHeight;
+        const pillarGeo = new THREE.CylinderGeometry(0.22, 0.35, pillarHeight, 6);
+        const pillarMesh = new THREE.Mesh(pillarGeo, pillarMat);
+
+        // Position cylinder halfway between the seabed/sloped ground and the light level
+        pillarMesh.position.set(x, groundHeight + pillarHeight / 2, z);
+        pillarMesh.castShadow = true;
+        pillarMesh.receiveShadow = true;
+        scene.add(pillarMesh);
+      }
+    };
+
+    // 4. Approach Lighting System (ALS) extending backward into valley (Z = -1040 to -1580)
+    for (let z = -1040; z >= -1580; z -= 60) {
+      alsPositions.push(0, yPos, z); // Centerline approach flash strobes (white)
+      checkAndBuildSupportPillar(0, z);
+
+      // Side approach lights (red wing-bars)
+      redPositions.push(-15, yPos, z);
+      checkAndBuildSupportPillar(-15, z);
+
+      redPositions.push(15, yPos, z);
+      checkAndBuildSupportPillar(15, z);
+    }
+
+    // Build procedural soft glow canvas light maps
+    const whiteTexture = this.createGlowTexture('#ffffff');
+    const greenTexture = this.createGlowTexture('#00ff66');
+    const redTexture = this.createGlowTexture('#ff3333');
+
+    // Assemble high-efficiency points clouds
+    this.addPointsLightGroup(scene, edgePositions, whiteTexture, 6.0, 0.45);
+    this.addPointsLightGroup(scene, alsPositions, whiteTexture, 8.0, 0.65);
+    this.addPointsLightGroup(scene, greenPositions, greenTexture, 7.0, 0.55);
+    this.addPointsLightGroup(scene, redPositions, redTexture, 7.0, 0.55);
+  }
+
+  /**
+   * Procedurally generates a CanvasTexture representing a smooth circular light glow.
+   * @param {string} colorHexStr 
+   * @returns {THREE.CanvasTexture}
+   */
+  createGlowTexture(colorHexStr) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 16;
+    canvas.height = 16;
+    const ctx = canvas.getContext('2d');
+
+    const gradient = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
+    gradient.addColorStop(0, colorHexStr);
+    gradient.addColorStop(0.3, colorHexStr);
+    gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 16, 16);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
+  /**
+   * Helper that builds and adds a Points mesh to the scene.
+   */
+  addPointsLightGroup(scene, posArray, texture, size, opacity) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(posArray, 3));
+
+    const mat = new THREE.PointsMaterial({
+      size: size,
+      map: texture,
+      transparent: true,
+      opacity: opacity,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    const points = new THREE.Points(geo, mat);
+    scene.add(points);
   }
 
   update(deltaTime) {
