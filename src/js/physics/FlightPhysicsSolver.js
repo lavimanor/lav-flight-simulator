@@ -4,6 +4,7 @@ import { Atmosphere } from './Atmosphere.js';
 import { PropulsionSolver } from './PropulsionSolver.js';
 import { DragSolver } from './DragSolver.js';
 import { BrakeSolver } from './BrakeSolver.js';
+import { LiftSolver } from './LiftSolver.js';
 
 export class FlightPhysicsSolver {
   static noise = new Noise(12345);
@@ -23,7 +24,6 @@ export class FlightPhysicsSolver {
     if (aircraft.isCrashed) {
       aircraft.velocity.set(0, 0, 0);
       aircraft.angularVelocity.set(0, 0, 0);
-      aircraft.controls.throttle = 0;
       aircraft.airspeed = 0;
       aircraft.indicatedAirspeed = 0;
       aircraft.groundSpeed = 0;
@@ -59,16 +59,21 @@ export class FlightPhysicsSolver {
     // Dynamic Flaps adjustment
     let flapsLiftBonus = 1.0;
     if (aircraft.flapsStage === 1) {
-      flapsLiftBonus = 1.20; // Flaps 50%: +20% lift
+      flapsLiftBonus = 1.20; // Flaps 50%
     } else if (aircraft.flapsStage === 2) {
-      flapsLiftBonus = 1.45; // Flaps 100%: +45% lift
+      flapsLiftBonus = 1.45; // Flaps 100%
     }
+
+    // Calculate relative velocities along aircraft axes to find true aerodynamic Angle of Attack (AoA)
+    const vForward = aircraft.velocity.dot(forwardVector);
+    const vUp = aircraft.velocity.dot(localUpVector);
+    const aoaRad = (Math.abs(vForward) > 0.1) ? Math.atan2(-vUp, vForward) : 0.0;
 
     // 1. Solve Propulsion System (Modular Engine/Fuel/Thrust solver)
     const thrustForceMagnitude = PropulsionSolver.solve(aircraft, airDensity, dt);
 
     // 2. Solve Aerodynamic Drag (Modular Drag solver)
-    const dragForceMagnitude = DragSolver.solve(aircraft, airDensity, dt);
+    const dragForceMagnitude = DragSolver.solve(aircraft, airDensity, aoaRad, dt);
 
     // Solve the gravity acceleration vector along the flight path (Pitch-up decelerates, pitch-down accelerates)
     const gravityAcceleration = -9.81 * forwardVector.y;
@@ -96,24 +101,30 @@ export class FlightPhysicsSolver {
     const seaLevelDensity = 1.225;
     aircraft.indicatedAirspeed = aircraft.airspeed * Math.sqrt(airDensity / seaLevelDensity);
 
-    // 5. Calculate vertical drift (sink rate) due to gravity overcoming wing lift
-    // Standard level stall speed base calculation
-    const stallSpeed = config.id === 'fighter' ? 28.0 : 14.0;
-    const liftScaling = Math.min(aircraft.indicatedAirspeed / (stallSpeed * 1.4), 1.0) * geLiftMultiplier * flapsLiftBonus;
-    const gravityDeficit = 9.81 * (1.0 - liftScaling);
+    // 5. Solve Aerodynamic Lift Force & Sink Rate
+    const { liftForceVector, sinkAcceleration } = LiftSolver.solve(aircraft, airDensity, geLiftMultiplier, flapsLiftBonus, aoaRad, dt);
     
     // Smoothly blend sink rate drift velocity (Only accumulate if in free flight; drain to 0 on ground contact)
     aircraft.sinkRate = aircraft.sinkRate || 0.0;
     if (aircraft.position.y > groundClearance + 0.1) {
-      aircraft.sinkRate = THREE.MathUtils.lerp(aircraft.sinkRate, gravityDeficit * 2.0, 4.0 * dt);
+      aircraft.sinkRate = THREE.MathUtils.lerp(aircraft.sinkRate, sinkAcceleration * 2.0, 4.0 * dt);
     } else {
       aircraft.sinkRate = THREE.MathUtils.lerp(aircraft.sinkRate, 0.0, 10.0 * dt);
     }
 
-    // 6. Assemble World Velocity Vector
-    // The aircraft travels forward along its nose vector, but drifts downward if lift is insufficient
+    // 6. Assemble World Velocity Vector with Side-Slip Dampening
+    // Bank-turn lateral slip drift (adds dynamic slip sliding during bank turning)
+    const localRightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(aircraft.group.quaternion);
+    const bankAngleRad = aircraft.rotation.z;
+    const slipDriftSpeed = -Math.sin(bankAngleRad) * Math.min(aircraft.airspeed / 20.0, 1.0) * 4.0;
+    
+    // Assemble vector: forward travel + downward sink + lateral side slip
     const targetVelocityVector = forwardVector.clone().multiplyScalar(aircraft.airspeed);
-    targetVelocityVector.y -= aircraft.sinkRate; // Apply downward gravity sink drift
+    targetVelocityVector.addScaledVector(localRightVector, slipDriftSpeed);
+    targetVelocityVector.y -= aircraft.sinkRate;
+
+    // Apply environment wind drift
+    targetVelocityVector.addScaledVector(windVector, 0.15); // Constant wind drift scaling
 
     aircraft.velocity.copy(targetVelocityVector);
 
@@ -127,8 +138,7 @@ export class FlightPhysicsSolver {
     if (aircraft.position.y <= groundClearance) {
       // Fetch sinking speed before clamp
       const preClampSinkingSpeed = aircraft.velocity.y;
-      const pitchAngleRad = Math.asin(THREE.MathUtils.clamp(forwardVector.y, -1.0, 1.0));
-      const pitchAngleDeg = Math.abs(pitchAngleRad * (180 / Math.PI));
+      const pitchAngleDeg = Math.abs(Math.asin(THREE.MathUtils.clamp(forwardVector.y, -1.0, 1.0)) * (180 / Math.PI));
 
       // CRASH DETECTION RESOLUTION
       const noseDiveImpact = pitchAngleDeg > 20.0;     // Nose first strike
@@ -160,6 +170,7 @@ export class FlightPhysicsSolver {
     aircraft.group.position.copy(aircraft.position);
 
     // 8. Aerodynamic Stall & Spin Loops
+    const stallSpeed = config.id === 'fighter' ? 28.0 : 14.0;
     aircraft.isStalled = (aircraft.indicatedAirspeed < stallSpeed) && (aircraft.position.y > terrainHeight + 2.0);
 
     if (aircraft.isStalled) {
@@ -174,10 +185,10 @@ export class FlightPhysicsSolver {
       aircraft.isSpinning = false;
     }
 
-    // Solve rotational physics controls (Controls vanish on ground resting or stall)
+    // Solve rotational physics controls with aerodynamic rotational damping
     const controlEffectiveness = (aircraft.isStalled || onGround) ? 0.08 : Math.min(aircraft.airspeed / 15.0, 1.2); 
 
-    // Smoothly interpolate control stick deflections to add rotational inertia (Removes twitchy snap-turn)
+    // Smoothly interpolate control stick deflections to add rotational inertia (removes snap rotation jitter)
     aircraft.controls.pitchSmoothed = THREE.MathUtils.lerp(aircraft.controls.pitchSmoothed || 0, aircraft.controls.pitch, 8.0 * dt);
     aircraft.controls.rollSmoothed = THREE.MathUtils.lerp(aircraft.controls.rollSmoothed || 0, aircraft.controls.roll, 8.0 * dt);
     aircraft.controls.yawSmoothed = THREE.MathUtils.lerp(aircraft.controls.yawSmoothed || 0, aircraft.controls.yaw, 8.0 * dt);
@@ -197,6 +208,16 @@ export class FlightPhysicsSolver {
       }
     }
 
+    // Aerodynamic angular velocity damping (resists rapid rotative turns based on airspeed & air density)
+    const densityRatio = airDensity / 1.225;
+    const speedRatio = Math.min(aircraft.airspeed / 20.0, 1.2);
+    const rotationalDamping = 1.5 * densityRatio * speedRatio; // Damping increases at higher speed/density
+    
+    // Apply smooth rotative momentum dampening
+    aircraft.angularVelocity.x = THREE.MathUtils.lerp(aircraft.angularVelocity.x, pitchVelocity, (6.0 + rotationalDamping) * dt);
+    aircraft.angularVelocity.y = THREE.MathUtils.lerp(aircraft.angularVelocity.y, yawVelocity, (6.0 + rotationalDamping) * dt);
+    aircraft.angularVelocity.z = THREE.MathUtils.lerp(aircraft.angularVelocity.z, rollVelocity, (6.0 + rotationalDamping) * dt);
+
     // Rotational turbulence
     if (weatherManager && weatherManager.turbulenceIntensity > 0) {
       const tIntensity = weatherManager.turbulenceIntensity;
@@ -206,15 +227,15 @@ export class FlightPhysicsSolver {
       const tRollGust = Math.cos(time * 4.9) * 0.15 * tIntensity;
       const tYawGust = Math.sin(time * 2.3) * 0.04 * tIntensity;
 
-      pitchVelocity += tPitchGust;
-      rollVelocity += tRollGust;
-      yawVelocity += tYawGust;
+      aircraft.angularVelocity.x += tPitchGust;
+      aircraft.angularVelocity.z += tRollGust;
+      aircraft.angularVelocity.y += tYawGust;
     }
 
     // Apply rotations in standard Euler order: X (pitch), Z (roll), Y (yaw)
-    aircraft.group.rotateX(pitchVelocity * dt);
-    aircraft.group.rotateZ(rollVelocity * dt);
-    aircraft.group.rotateY(yawVelocity * dt);
+    aircraft.group.rotateX(aircraft.angularVelocity.x * dt);
+    aircraft.group.rotateZ(aircraft.angularVelocity.z * dt);
+    aircraft.group.rotateY(aircraft.angularVelocity.y * dt);
 
     // Store state rotations back in variables
     aircraft.rotation.copy(aircraft.group.rotation);
@@ -228,8 +249,7 @@ export class FlightPhysicsSolver {
     const pitchG = aircraft.controls.pitchSmoothed * pitchGScale * Math.min(aircraft.airspeed / 25.0, 1.5);
 
     // Bank turn G load: sin(bank) * centrifugal scale * speed ratio
-    const bankAngleRad = Math.abs(aircraft.rotation.z);
-    const turnG = Math.sin(bankAngleRad) * 2.0 * Math.min(aircraft.airspeed / 25.0, 1.5);
+    const turnG = Math.sin(Math.abs(aircraft.rotation.z)) * 2.0 * Math.min(aircraft.airspeed / 25.0, 1.5);
 
     // Sum overall vertical G-force felt by the pilot
     const calculatedG = gravityContribution + pitchG + turnG;
