@@ -1,10 +1,8 @@
-/* Screen Reset and Layout Setup */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
-
 html, body {
   width: 100%;
   height: 100%;
@@ -13,8 +11,6 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   user-select: none;
 }
-
-/* 0. Physiological Vision Screen overlays */
 .fade-overlay {
   position: absolute;
   top: 0;
@@ -26,16 +22,13 @@ html, body {
   opacity: 0;
   transition: opacity 0.1s ease;
 }
-
 #hud-blackout-overlay {
   background-color: #000000;
 }
-
 #hud-redout-overlay {
   background-color: #ff0000;
   mix-blend-mode: multiply;
 }
-
 #canvas-container {
   width: 100%;
   height: 100%;
@@ -44,8 +37,6 @@ html, body {
   left: 0;
   z-index: 1;
 }
-
-/* Pre-Flight Main Startup Screen Styles */
 #main-menu-overlay {
   position: absolute;
   top: 0;
@@ -60,20 +51,17 @@ html, body {
   backdrop-filter: blur(5px);
   transition: opacity 0.4s ease, visibility 0.4s ease;
 }
-
 #main-menu-overlay.hidden {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
 }
-
 #main-menu-content {
   width: 500px;
   font-family: Consolas, "Courier New", monospace;
   color: #ffffff;
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
 }
-
 .menu-brand {
   font-size: 2.8rem;
   font-weight: 900;
@@ -83,7 +71,6 @@ html, body {
   text-shadow: 0 0 8px rgba(0, 255, 102, 0.5);
   margin-bottom: 5px;
 }
-
 .menu-tagline {
   font-size: 11px;
   letter-spacing: 0.22em;
@@ -93,14 +80,12 @@ html, body {
   border-bottom: 1.5px solid rgba(0, 255, 102, 0.2);
   padding-bottom: 15px;
 }
-
 .menu-main-actions {
   display: flex;
   flex-direction: column;
   gap: 15px;
   margin-bottom: 60px;
 }
-
 .menu-main-actions button {
   font-family: Consolas, "Courier New", monospace;
   font-size: 13px;
@@ -114,41 +99,34 @@ html, body {
   transition: all 0.2s ease;
   pointer-events: auto;
 }
-
 .menu-primary-btn {
   background: #00ff66;
   border: 1px solid #00ff66;
   color: #0c0f12;
   box-shadow: 0 0 10px rgba(0, 255, 102, 0.3);
 }
-
 .menu-primary-btn:hover {
   background: #00cc52;
   border-color: #00cc52;
   box-shadow: 0 0 18px rgba(0, 255, 102, 0.6);
   transform: translateX(6px);
 }
-
 .menu-secondary-btn {
   background: rgba(0, 25, 5, 0.5);
   border: 1.5px solid rgba(0, 255, 102, 0.4);
   color: #00ff66;
-  text-shadow: 0 0 3px rgba(0, 255, 102, 0.6);
+  text-shadow: 0 0 3px rgba(0, 25, 102, 0.6);
 }
-
 .menu-secondary-btn:hover {
   background: rgba(0, 25, 102, 0.15);
   border-color: #00ff66;
-  box-shadow: 0 0 12px rgba(0, 255, 102, 0.4);
+  box-shadow: 0 0 12px rgba(0, 25, 102, 0.4);
   transform: translateX(6px);
 }
-
 .menu-footer {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.4);
 }
-
-/* Settings Configuration Modal Styles */
 #hud-settings-modal {
   position: absolute;
   top: 0;
@@ -156,33 +134,26 @@ html, body {
   width: 100%;
   height: 100%;
   background: rgba(10, 15, 20, 0.82);
-  z-index: 105; /* Positioned above pre-flight main menu overlays */
+  z-index: 105;
   display: flex;
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(12px);
   pointer-events: auto;
 }
-
 #hud-settings-modal.hidden {
   display: none !important;
 }
-
 #hud-settings-content {
   background: #0f141c;
   border: 2px solid #00ff66;
   border-radius: 8px;
   width: 500px;
-  max-height: 90%;
-  overflow-y: auto;
   padding: 30px;
   color: #ffffff;
   box-shadow: 0 10px 40px rgba(0, 255, 102, 0.15);
   font-family: Consolas, "Courier New", monospace;
-  scrollbar-width: thin;
-  scrollbar-color: #00ff66 #0f141c;
 }
-
 #hud-settings-content h2 {
   font-size: 1.5rem;
   font-weight: bold;
@@ -194,11 +165,9 @@ html, body {
   text-shadow: 0 0 4px rgba(0, 255, 102, 0.4);
   margin-bottom: 20px;
 }
-
 .settings-group {
   margin-bottom: 30px;
 }
-
 .settings-group h3 {
   font-size: 11px;
   letter-spacing: 0.12em;
@@ -208,27 +177,23 @@ html, body {
   border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
   padding-bottom: 5px;
 }
-
 .setting-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
 }
-
 .setting-row label {
   font-size: 12px;
   font-weight: bold;
   width: 130px;
 }
-
 .setting-row input[type="range"] {
   flex-grow: 1;
   margin: 0 15px;
   accent-color: #00ff66;
   cursor: pointer;
 }
-
 .setting-row .value-display {
   font-size: 12px;
   font-weight: bold;
@@ -236,8 +201,6 @@ html, body {
   width: 45px;
   text-align: right;
 }
-
-/* Active HUD Interface Overlays */
 #hud-overlay {
   position: absolute;
   top: 0;
@@ -251,8 +214,6 @@ html, body {
   text-shadow: 0 0 3px rgba(0, 255, 102, 0.6);
   font-size: 14px;
 }
-
-/* Generic HUD component panel container styles */
 .hud-box {
   background: rgba(0, 30, 10, 0.25);
   border: 1.5px solid rgba(0, 255, 102, 0.4);
@@ -260,7 +221,6 @@ html, body {
   backdrop-filter: blur(2px);
   position: absolute;
 }
-
 .hud-title {
   font-size: 11px;
   text-align: center;
@@ -268,27 +228,23 @@ html, body {
   padding: 2px 0;
   letter-spacing: 0.1em;
 }
-
 .hud-numerical-readout {
   font-size: 22px;
   font-weight: bold;
   padding: 6px 12px;
   text-align: center;
 }
-
 .hud-unit {
   font-size: 11px;
   font-weight: normal;
   opacity: 0.8;
 }
-
-/* Action Control Buttons */
 #menu-toggle-btn {
   position: absolute;
   top: 25px;
   right: 40px;
   z-index: 15;
-  pointer-events: auto; 
+  pointer-events: auto;
   background: rgba(0, 25, 5, 0.7);
   border: 1.5px solid #00ff66;
   color: #00ff66;
@@ -301,18 +257,16 @@ html, body {
   box-shadow: 0 0 10px rgba(0, 25, 102, 0.2);
   transition: all 0.2s ease;
 }
-
 #menu-toggle-btn:hover {
   background: rgba(0, 25, 102, 0.2);
   box-shadow: 0 0 15px rgba(0, 255, 102, 0.5);
 }
-
 #hud-btn-mainmenu {
   position: absolute;
   top: 25px;
-  right: 230px; /* Shifted left of the Select Aircraft toggle button */
+  right: 230px;
   z-index: 15;
-  pointer-events: auto; 
+  pointer-events: auto;
   background: rgba(0, 25, 5, 0.7);
   border: 1.5px solid #00ff66;
   color: #00ff66;
@@ -325,13 +279,10 @@ html, body {
   box-shadow: 0 0 10px rgba(0, 25, 102, 0.2);
   transition: all 0.2s ease;
 }
-
 #hud-btn-mainmenu:hover {
   background: rgba(0, 25, 102, 0.2);
   box-shadow: 0 0 15px rgba(0, 255, 102, 0.5);
 }
-
-/* 1. Top Heading Indicator */
 #hud-heading-container {
   top: 25px;
   left: 50%;
@@ -340,18 +291,15 @@ html, body {
   height: 62px;
   text-align: center;
 }
-
 #hud-heading-ticker {
   font-size: 10px;
   margin-top: 1px;
 }
-
 #hud-heading-val {
   font-size: 18px;
   font-weight: bold;
   margin-top: -1px;
 }
-
 #hud-heading-tape-view {
   width: 100%;
   height: 20px;
@@ -359,9 +307,8 @@ html, body {
   position: relative;
   border-top: 1px dashed rgba(0, 255, 102, 0.3);
 }
-
 #hud-heading-tape-scroll {
-  width: 720px; 
+  width: 720px;
   height: 100%;
   background: repeating-linear-gradient(
     90deg,
@@ -371,18 +318,15 @@ html, body {
   );
   position: absolute;
   left: 50%;
-  margin-left: -360px; 
+  margin-left: -360px;
   transition: transform 0.05s linear;
 }
-
-/* 2. Left Speed Tape Panel */
 #hud-speed-container {
   top: 50%;
   left: 40px;
   transform: translateY(-50%);
   width: 110px;
 }
-
 .tape-bar-indicator {
   height: 110px;
   width: 4px;
@@ -392,21 +336,16 @@ html, body {
   float: right;
   border-left: 1.5px dashed rgba(0, 255, 102, 0.4);
 }
-
-/* 3. Right Altitude Tape Panel */
 #hud-altitude-container {
   top: 50%;
   right: 40px;
   transform: translateY(-50%);
   width: 110px;
 }
-
 .tape-bar-indicator.right-aligned {
   float: left;
   border-right: 1.5px dashed rgba(0, 255, 102, 0.4);
 }
-
-/* Stacked Tactical Left Sidebar Warnings Panel */
 #hud-warnings-panel {
   position: absolute;
   top: 100px;
@@ -418,8 +357,6 @@ html, body {
   gap: 8px;
   pointer-events: none;
 }
-
-/* Centered Emergency Crash Panel */
 #hud-crash-panel {
   position: absolute;
   top: 40%;
@@ -429,13 +366,12 @@ html, body {
   text-align: center;
   pointer-events: none;
 }
-
 .hud-alert-box {
   background: rgba(40, 0, 0, 0.65);
   border: 1.5px solid #ff2222;
   color: #ff3333;
   font-weight: bold;
-  font-size: 13px; /* Slightly more compact for stacked sidebar */
+  font-size: 13px;
   padding: 6px 12px;
   border-radius: 3px;
   letter-spacing: 0.1em;
@@ -443,7 +379,6 @@ html, body {
   animation: hudFlash 0.6s infinite alternate;
   width: fit-content;
 }
-
 .hud-alert-box.engine-off {
   background: rgba(40, 0, 0, 0.7);
   border-color: #ff3333;
@@ -451,7 +386,6 @@ html, body {
   box-shadow: 0 0 10px rgba(255, 30, 30, 0.4);
   font-size: 13px;
 }
-
 .hud-alert-box.airbrakes {
   background: rgba(0, 30, 45, 0.65);
   border-color: #00e1ff;
@@ -459,7 +393,6 @@ html, body {
   box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
   font-size: 13px;
 }
-
 .hud-alert-box.afterburner {
   background: rgba(40, 15, 0, 0.7);
   border-color: #ff5d00;
@@ -467,7 +400,6 @@ html, body {
   box-shadow: 0 0 10px rgba(255, 93, 0, 0.4);
   font-size: 13px;
 }
-
 .hud-alert-box.brakes {
   background: rgba(0, 30, 40, 0.6);
   border-color: #00e1ff;
@@ -475,7 +407,6 @@ html, body {
   box-shadow: 0 0 10px rgba(0, 225, 255, 0.25);
   font-size: 13px;
 }
-
 .hud-alert-box.scrape {
   background: rgba(40, 20, 0, 0.7);
   border-color: #ffaa00;
@@ -483,7 +414,6 @@ html, body {
   box-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
   font-size: 13px;
 }
-
 .hud-alert-box.crash {
   background: rgba(30, 0, 0, 0.82);
   border-color: #ff1111;
@@ -492,7 +422,6 @@ html, body {
   padding: 24px 40px;
   font-size: 14px;
 }
-
 .hud-alert-box.crash h2 {
   font-size: 28px;
   margin-bottom: 8px;
@@ -500,24 +429,19 @@ html, body {
   color: #ff1111;
   text-shadow: 0 0 8px rgba(255, 17, 17, 0.6);
 }
-
 .hud-alert-box.crash p {
   font-size: 13px;
   color: #ffffff;
   letter-spacing: 0.05em;
   text-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
 }
-
 .hud-alert-box.hidden {
   display: none !important;
 }
-
 @keyframes hudFlash {
   from { opacity: 0.3; }
   to { opacity: 1.0; }
 }
-
-/* 4. Center Sight & Pitch Ladder */
 #hud-center-sight {
   position: absolute;
   top: 50%;
@@ -525,9 +449,8 @@ html, body {
   transform: translate(-50%, -50%);
   width: 400px;
   height: 400px;
-  overflow: hidden; 
+  overflow: hidden;
 }
-
 #hud-aircraft-sight {
   position: absolute;
   top: 50%;
@@ -535,7 +458,6 @@ html, body {
   transform: translate(-50%, -50%);
   z-index: 12;
 }
-
 #hud-aircraft-sight .center-dot {
   display: block;
   width: 6px;
@@ -544,8 +466,7 @@ html, body {
   border-radius: 50%;
   box-shadow: 0 0 4px #00ff66;
 }
-
-#hud-aircraft-sight .left-wing, 
+#hud-aircraft-sight .left-wing,
 #hud-aircraft-sight .right-wing {
   position: absolute;
   top: 2px;
@@ -553,11 +474,8 @@ html, body {
   height: 2px;
   background-color: #00ff66;
 }
-
 #hud-aircraft-sight .left-wing { right: 12px; }
 #hud-aircraft-sight .right-wing { left: 12px; }
-
-/* Dynamic Pitch Ladder / Horizon Reference */
 #hud-pitch-ladder {
   position: absolute;
   top: 0;
@@ -567,7 +485,6 @@ html, body {
   z-index: 11;
   transition: transform 0.05s linear;
 }
-
 .pitch-line {
   position: absolute;
   left: 50%;
@@ -575,14 +492,12 @@ html, body {
   height: 2px;
   width: 100px;
 }
-
 .pitch-line.horizon {
   width: 160px;
   background-color: #00ff66;
   height: 3px;
   box-shadow: 0 0 4px rgba(0, 255, 102, 0.8);
 }
-
 .pitch-line.positive {
   background-color: #00ff66;
 }
@@ -593,11 +508,10 @@ html, body {
   width: 2px;
   height: 8px;
   background-color: #00ff66;
-  bottom: -8px; 
+  bottom: -8px;
 }
 .pitch-line.positive::before { left: 0; }
 .pitch-line.positive::after { right: 0; }
-
 .pitch-line.negative {
   background: repeating-linear-gradient(
     90deg,
@@ -614,11 +528,10 @@ html, body {
   width: 2px;
   height: 8px;
   background-color: #00ff66;
-  top: -8px; 
+  top: -8px;
 }
 .pitch-line.negative::before { left: 0; }
 .pitch-line.negative::after { right: 0; }
-
 .pitch-line span {
   position: absolute;
   font-size: 10px;
@@ -627,7 +540,6 @@ html, body {
 }
 .pitch-line span:first-child { left: -24px; }
 .pitch-line span:last-child { right: -24px; }
-
 /* Flight Path Vector Reticle Style */
 #hud-fpv {
   position: absolute;
@@ -640,7 +552,6 @@ html, body {
   pointer-events: none;
   display: none;
 }
-
 #hud-fpv::before { /* Left wing */
   content: '';
   position: absolute;
@@ -650,7 +561,6 @@ html, body {
   height: 1.5px;
   background-color: #00ff66;
 }
-
 #hud-fpv::after { /* Right wing */
   content: '';
   position: absolute;
@@ -660,7 +570,6 @@ html, body {
   height: 1.5px;
   background-color: #00ff66;
 }
-
 #hud-fpv .top-fin {
   position: absolute;
   top: -12px;
@@ -669,8 +578,6 @@ html, body {
   height: 12px;
   background-color: #00ff66;
 }
-
-/* ILS Container Scale Grid Styles */
 #hud-ils-container {
   position: absolute;
   top: 50%;
@@ -681,11 +588,9 @@ html, body {
   z-index: 12;
   pointer-events: none;
 }
-
 #hud-ils-container.hidden {
   display: none !important;
 }
-
 .ils-vertical-scale {
   position: absolute;
   right: 15px;
@@ -700,12 +605,10 @@ html, body {
   color: rgba(0, 255, 102, 0.4);
   font-size: 16px;
 }
-
 .ils-vertical-scale .center-dash {
   font-weight: bold;
   color: rgba(0, 255, 102, 0.6);
 }
-
 #hud-ils-glideslope {
   position: absolute;
   left: -4px;
@@ -715,7 +618,6 @@ html, body {
   box-shadow: 0 0 4px #00ff66;
   transition: top 0.1s linear;
 }
-
 .ils-horizontal-scale {
   position: absolute;
   bottom: 15px;
@@ -729,12 +631,10 @@ html, body {
   color: rgba(0, 255, 102, 0.4);
   font-size: 16px;
 }
-
 .ils-horizontal-scale .center-dash {
   font-weight: bold;
   color: rgba(0, 255, 102, 0.6);
 }
-
 #hud-ils-localizer {
   position: absolute;
   bottom: -4px;
@@ -744,39 +644,32 @@ html, body {
   box-shadow: 0 0 4px #00ff66;
   transition: left 0.1s linear;
 }
-
-/* 5. Bottom Instrument Panel */
 #hud-data-panel {
   bottom: 25px;
   left: 40px;
   width: 260px;
   padding: 12px;
 }
-
 .hud-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
 }
-
 .hud-row:last-child {
   margin-bottom: 0;
 }
-
 .hud-row .label {
   font-size: 11px;
   font-weight: bold;
   width: 40px;
 }
-
 .hud-row .value {
   font-size: 15px;
   font-weight: bold;
   text-align: right;
-  width: 90px; 
+  width: 90px;
 }
-
 .hud-row .bar-container {
   flex-grow: 1;
   height: 8px;
@@ -786,7 +679,6 @@ html, body {
   margin: 0 10px;
   overflow: hidden;
 }
-
 #hud-throttle-bar {
   height: 100%;
   background-color: #00ff66;
@@ -794,14 +686,11 @@ html, body {
   width: 0%;
   transition: width 0.1s linear;
 }
-
 .advanced-row {
   border-top: 1px dashed rgba(0, 255, 102, 0.15);
   padding-top: 8px;
   margin-top: 4px;
 }
-
-/* Selection Hangar Modal Styles */
 #hud-menu-modal {
   position: absolute;
   top: 0;
@@ -814,13 +703,11 @@ html, body {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(12px);
-  pointer-events: auto; 
+  pointer-events: auto;
 }
-
 #hud-menu-modal.hidden {
   display: none !important;
 }
-
 #hud-menu-content {
   background: #0f141c;
   border: 2px solid #00ff66;
@@ -831,7 +718,6 @@ html, body {
   box-shadow: 0 10px 40px rgba(0, 255, 102, 0.15);
   font-family: Consolas, "Courier New", monospace;
 }
-
 #hud-menu-content h2 {
   font-size: 1.6rem;
   font-weight: bold;
@@ -843,13 +729,11 @@ html, body {
   text-shadow: 0 0 4px rgba(0, 255, 102, 0.4);
   margin-bottom: 20px;
 }
-
 .aircraft-cards-container {
   display: flex;
   gap: 20px;
   margin-bottom: 24px;
 }
-
 .aircraft-card {
   flex: 1;
   background: rgba(255, 255, 255, 0.03);
@@ -859,20 +743,17 @@ html, body {
   cursor: pointer;
   transition: all 0.25s ease;
 }
-
 .aircraft-card:hover {
   background: rgba(0, 25, 102, 0.03);
   border-color: rgba(0, 25, 102, 0.4);
   color: #ffffff;
 }
-
 .aircraft-card.selected {
   background: rgba(0, 25, 102, 0.06);
   border-color: #00ff66;
   color: #00ff66;
   box-shadow: 0 0 12px rgba(0, 25, 102, 0.15);
 }
-
 .aircraft-card .card-title {
   font-size: 1.15rem;
   font-weight: bold;
@@ -883,7 +764,6 @@ html, body {
   color: #00ff66;
   text-shadow: 0 0 3px rgba(0, 25, 102, 0.3);
 }
-
 .aircraft-card .description {
   font-size: 11px;
   line-height: 1.4;
@@ -892,42 +772,34 @@ html, body {
   height: 55px;
   overflow: hidden;
 }
-
 .aircraft-card .specs {
   font-size: 11px;
   border-top: 1px dashed rgba(255, 255, 255, 0.1);
   padding-top: 10px;
 }
-
 .aircraft-card .specs div {
   margin-bottom: 4px;
 }
-
 .aircraft-card .specs div span {
   font-weight: bold;
   color: #00ff66;
   margin-right: 4px;
 }
-
-/* Weather Environment Selector Styles */
 #menu-weather-section {
   border-top: 1px dashed rgba(0, 25, 102, 0.25);
   margin-bottom: 30px;
   padding-top: 16px;
 }
-
 #menu-weather-section h3 {
   font-size: 1rem;
   text-transform: uppercase;
   color: #00ff66;
   margin-bottom: 12px;
 }
-
 .weather-selector-row {
   display: flex;
   gap: 15px;
 }
-
 .weather-btn {
   flex: 1;
   background: rgba(255, 255, 255, 0.03);
@@ -941,26 +813,22 @@ html, body {
   cursor: pointer;
   transition: all 0.2s ease;
 }
-
 .weather-btn:hover {
   background: rgba(0, 25, 102, 0.03);
   border-color: rgba(0, 25, 102, 0.4);
   color: #ffffff;
 }
-
 .weather-btn.selected {
   background: rgba(0, 25, 102, 0.08);
   border-color: #00ff66;
   color: #00ff66;
   box-shadow: 0 0 10px rgba(0, 25, 102, 0.2);
 }
-
 .menu-action-row {
   display: flex;
   justify-content: flex-end;
   gap: 15px;
 }
-
 .menu-action-row button {
   font-family: Consolas, "Courier New", monospace;
   font-weight: bold;
@@ -970,25 +838,21 @@ html, body {
   cursor: pointer;
   transition: all 0.2s ease;
 }
-
 #menu-spawn-btn {
   background: #00ff66;
   border: 1px solid #00ff66;
   color: #0c0f12;
 }
-
 #menu-spawn-btn:hover {
   background: #00cc52;
   border-color: #00cc52;
   box-shadow: 0 0 12px rgba(0, 25, 102, 0.4);
 }
-
 #menu-close-btn {
   background: transparent;
   border: 1.5px solid rgba(255, 255, 255, 0.2);
   color: #ffffff;
 }
-
 #menu-close-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: #ffffff;
