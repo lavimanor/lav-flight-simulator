@@ -1,0 +1,28 @@
+{
+  "id": "trainer",
+  "name": "T-1 Basic Trainer",
+  "mass": 1100,
+  "wingArea": 15.0,
+  "aspectRatio": 7.5,
+  "maxThrust": 6800,
+  "rollRate": 1.5,
+  "pitchRate": 1.0,
+  "yawRate": 0.5,
+  "dragCoefficientZero": 0.035,
+  "liftCoefficientMax": 1.4,
+  "emptyWeight": 800,
+  "maxFuelCapacity": 120,
+  "dimensions": {
+    "span": 11.0,
+    "length": 8.2,
+    "height": 2.4
+  },
+  "camera": {
+    "offsetX": 0.0,
+    "offsetY": 4.0,
+    "offsetZ": -15.0,
+    "lookAheadDistance": 6.0
+  },
+  "modelType": "built-in",
+  "modelPath": ""
+}

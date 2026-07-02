@@ -1,13 +1,17 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export class AircraftMeshBuilder {
-  /**
-   * Procedurally generates the 3D model geometry/materials and mounts them to the aircraft group.
-   * @param {AircraftBase} aircraft 
-   */
   static build(aircraft) {
-    aircraft.gearGroup = new THREE.Group();
+    aircraft.gearGroup = new THREE.Group(); 
     aircraft.group.add(aircraft.gearGroup);
+
+    // Attempt to load external custom GLTF mesh if configured [3, 4]
+    if (aircraft.config && aircraft.config.modelType === 'custom') {
+      this.loadCustomModel(aircraft);
+      return;
+    }
+
     if (aircraft.config.id === 'fighter') {
       aircraft.afterburnerGroup = new THREE.Group();
       aircraft.afterburnerGroup.visible = false;
@@ -437,6 +441,64 @@ export class AircraftMeshBuilder {
     const rightWheel = new THREE.Mesh(tireGeo, tireMat);
     rightWheel.position.set(1.5, -1.7, -0.6);
     aircraft.gearGroup.add(rightWheel);
+
+    this.configureShadows(aircraft.group);
+  }
+
+  /**
+   * Loads external GLTF models and adds them to the aircraft group.
+   * Falls back to procedural placeholder glider mesh on load/parse error [3].
+   */
+  static loadCustomModel(aircraft) {
+    const loader = new GLTFLoader();
+    const modelPath = aircraft.config.modelPath || '';
+
+    loader.load(
+      modelPath,
+      (gltf) => {
+        gltf.scene.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        aircraft.group.add(gltf.scene);
+        console.log(`[AircraftMeshBuilder] Loaded custom aircraft model: ${modelPath}`);
+      },
+      undefined,
+      (error) => {
+        console.error(`[AircraftMeshBuilder] GLTFLoader failed to parse '${modelPath}'. Invoking safe fallback:`, error);
+        this.buildPlaceholder(aircraft);
+      }
+    );
+  }
+
+  static buildPlaceholder(aircraft) {
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0xff1111, roughness: 0.5 }); // High visibility warning red
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.6 });
+
+    // 1. Sleek box fuselage representing bounds
+    const fuseGeo = new THREE.BoxGeometry(0.8, 0.8, 4.0);
+    const fuselage = new THREE.Mesh(fuseGeo, baseMat);
+    aircraft.group.add(fuselage);
+
+    // 2. Mock wings
+    const wingGeo = new THREE.BoxGeometry(7.0, 0.04, 1.2);
+    const wing = new THREE.Mesh(wingGeo, wingMat);
+    wing.position.set(0, 0, 0.3);
+    aircraft.group.add(wing);
+
+    // 3. Mock tail stabilizer
+    const stabilizerGeo = new THREE.BoxGeometry(2.2, 0.04, 0.6);
+    const stabilizer = new THREE.Mesh(stabilizerGeo, wingMat);
+    stabilizer.position.set(0, 0.1, -1.8);
+    aircraft.group.add(stabilizer);
+
+    const rudderGeo = new THREE.BoxGeometry(0.04, 1.4, 0.6);
+    rudderGeo.translate(0, 0.7, 0);
+    const rudder = new THREE.Mesh(rudderGeo, baseMat);
+    rudder.position.set(0, 0.1, -1.8);
+    aircraft.group.add(rudder);
 
     this.configureShadows(aircraft.group);
   }

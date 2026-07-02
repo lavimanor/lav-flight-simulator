@@ -1,0 +1,28 @@
+{
+  "id": "fighter",
+  "name": "F-18 Strike Fighter",
+  "mass": 9500,
+  "wingArea": 38.0,
+  "aspectRatio": 3.5,
+  "maxThrust": 115000,
+  "rollRate": 3.0,
+  "pitchRate": 1.8,
+  "yawRate": 0.8,
+  "dragCoefficientZero": 0.018,
+  "liftCoefficientMax": 1.8,
+  "emptyWeight": 8000,
+  "maxFuelCapacity": 4000,
+  "dimensions": {
+    "span": 11.4,
+    "length": 17.1,
+    "height": 4.7
+  },
+  "camera": {
+    "offsetX": 0.0,
+    "offsetY": 5.0,
+    "offsetZ": -18.0,
+    "lookAheadDistance": 8.0
+  },
+  "modelType": "built-in",
+  "modelPath": ""
+}

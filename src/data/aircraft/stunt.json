@@ -1,0 +1,28 @@
+{
+  "id": "stunt",
+  "name": "S-2 Acrobatic Stunt",
+  "mass": 750,
+  "wingArea": 11.5,
+  "aspectRatio": 5.2,
+  "maxThrust": 5200,
+  "rollRate": 4.5,
+  "pitchRate": 2.2,
+  "yawRate": 1.2,
+  "dragCoefficientZero": 0.042,
+  "liftCoefficientMax": 1.35,
+  "emptyWeight": 550,
+  "maxFuelCapacity": 80,
+  "dimensions": {
+    "span": 6.2,
+    "length": 5.8,
+    "height": 2.1
+  },
+  "camera": {
+    "offsetX": 0.0,
+    "offsetY": 2.6,
+    "offsetZ": -9.0,
+    "lookAheadDistance": 4.0
+  },
+  "modelType": "built-in",
+  "modelPath": ""
+}

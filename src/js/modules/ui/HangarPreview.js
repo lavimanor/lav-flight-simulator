@@ -62,6 +62,13 @@ export class HangarPreview {
   setAircraft(configId) {
     if (!this.scene) return;
 
+    // Safety check: if configurations are still loading asynchronously, defer rendering [3]
+    const activeConfig = AircraftConfig[configId];
+    if (!activeConfig) {
+      console.warn(`[HangarPreview] Configuration for '${configId}' is not loaded yet. Deferring rendering.`);
+      return;
+    }
+
     // Clear previous mesh groups
     while (this.previewGroup.children.length > 0) {
       const child = this.previewGroup.children[0];
@@ -73,7 +80,7 @@ export class HangarPreview {
 
     // Assemble mock aircraft structure
     const mockAircraft = {
-      config: AircraftConfig[configId],
+      config: activeConfig,
       group: new THREE.Group(),
       gearGroup: new THREE.Group()
     };

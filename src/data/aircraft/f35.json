@@ -1,0 +1,28 @@
+{
+  "id": "f35",
+  "name": "F-35A Lightning II",
+  "mass": 13500,
+  "wingArea": 42.7,
+  "aspectRatio": 2.4,
+  "maxThrust": 191000,
+  "rollRate": 3.2,
+  "pitchRate": 2.0,
+  "yawRate": 0.9,
+  "dragCoefficientZero": 0.016,
+  "liftCoefficientMax": 1.75,
+  "emptyWeight": 13200,
+  "maxFuelCapacity": 8300,
+  "dimensions": {
+    "span": 10.7,
+    "length": 15.7,
+    "height": 4.4
+  },
+  "camera": {
+    "offsetX": 0.0,
+    "offsetY": 5.0,
+    "offsetZ": -18.0,
+    "lookAheadDistance": 8.5
+  },
+  "modelType": "custom",
+  "modelPath": "assets/model/f35.glb"
+}

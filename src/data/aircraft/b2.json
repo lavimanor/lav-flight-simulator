@@ -1,0 +1,28 @@
+{
+  "id": "b2",
+  "name": "B-2 Spirit Stealth Bomber",
+  "mass": 72000,
+  "wingArea": 478.0,
+  "aspectRatio": 3.6,
+  "maxThrust": 310000,
+  "rollRate": 0.22,
+  "pitchRate": 0.30,
+  "yawRate": 0.15,
+  "dragCoefficientZero": 0.012,
+  "liftCoefficientMax": 1.65,
+  "emptyWeight": 51000,
+  "maxFuelCapacity": 75000,
+  "dimensions": {
+    "span": 52.4,
+    "length": 21.0,
+    "height": 5.2
+  },
+  "camera": {
+    "offsetX": 0.0,
+    "offsetY": 12.0,
+    "offsetZ": -42.0,
+    "lookAheadDistance": 15.0
+  },
+  "modelType": "custom",
+  "modelPath": "assets/model/b2.glb"
+}

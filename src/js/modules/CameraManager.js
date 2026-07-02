@@ -48,15 +48,15 @@ export class CameraManager {
   }
 
   updateThirdPersonFollow(aircraft, camera, deltaTime) {
-    // 1. Smoothly interpolate a trailing quaternion to lag behind aircraft's roll/yaw rotations
+    // Read camera offsets directly configured in the active aircraft configuration [3]
+    const camConfig = aircraft.config.camera || { offsetX: 0, offsetY: 4, offsetZ: -15, lookAheadDistance: 6.0 };
+    this.offset.set(camConfig.offsetX, camConfig.offsetY, camConfig.offsetZ);
+    this.lookAheadDistance = camConfig.lookAheadDistance ?? 6.0;
+
     const slerpFactor = 1.0 - Math.exp(-this.cameraSlerpSpeed * deltaTime);
     this.cameraQuat.slerp(aircraft.group.quaternion, slerpFactor);
-
-    // 2. Calculate ideal camera position by rotating local offsets using trailing cameraQuat
     const relativeOffset = this.offset.clone().applyQuaternion(this.cameraQuat);
     this.targetCameraPos.copy(aircraft.position).add(relativeOffset);
-
-    // 3. Project lookAt target vector slightly in front of flight direction
     const forwardDir = new THREE.Vector3(0, 0, 1).applyQuaternion(aircraft.group.quaternion);
     this.targetLookAt.copy(aircraft.position).addScaledVector(forwardDir, this.lookAheadDistance);
 

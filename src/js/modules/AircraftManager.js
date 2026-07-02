@@ -11,9 +11,55 @@ export class AircraftManager {
 
   init(engine) {
     this.engine = engine;
+    this.configs = AircraftConfig; // Bind register reference
+    
+    // Load local aircraft JSON configuration profiles asynchronously [3]
+    this.loadAllAircraftConfigs().then(() => {
+      this.spawnAircraft('trainer', new THREE.Vector3(0, 181.2, -500));
+      
+      // Update UI panels once coordinates and parameters are loaded
+      const menuManager = this.engine.moduleManager.get('Menu');
+      if (menuManager) {
+        menuManager.updateSpecsPanel();
+        // Trigger the 3D preview to load now that configurations are ready [3, 4]
+        if (menuManager.preview) {
+          menuManager.preview.setAircraft(menuManager.selectedAircraftId);
+        }
+      }
+    });
+  }
 
-    // Spawn aircraft resting on Runway asphalt at Y: 181.2m (180m plateau + 1.2m landing gear offset)
-    this.spawnAircraft('trainer', new THREE.Vector3(0, 181.2, -500));
+  async loadAllAircraftConfigs() {
+    const ids = ['trainer', 'fighter', 'stunt', 'cargo', 'f35', 'f16', 'b2'];
+    for (const id of ids) {
+      try {
+        const response = await fetch(`data/aircraft/${id}.json`);
+        if (!response.ok) throw new Error(`Fetch failed`);
+        const config = await response.json();
+        this.configs[id] = config;
+      } catch (error) {
+        console.error(`[AircraftManager] Failed to load JSON config for '${id}', falling back to default parameters:`, error);
+        // Resilient safe fallback parameters to prevent app lockouts [3]
+        this.configs[id] = {
+          id,
+          name: `${id.toUpperCase()} (Fallback)`,
+          mass: 1000,
+          wingArea: 15.0,
+          aspectRatio: 7.0,
+          maxThrust: 6000,
+          rollRate: 1.5,
+          pitchRate: 1.0,
+          yawRate: 0.5,
+          dragCoefficientZero: 0.03,
+          liftCoefficientMax: 1.4,
+          emptyWeight: 800,
+          maxFuelCapacity: 100,
+          dimensions: { span: 10, length: 8, height: 2 },
+          camera: { offsetX: 0, offsetY: 4, offsetZ: -15, lookAheadDistance: 6 },
+          modelType: 'built-in'
+        };
+      }
+    }
   }
 
   spawnAircraft(configId, position) {

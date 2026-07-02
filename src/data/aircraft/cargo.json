@@ -1,0 +1,28 @@
+{
+  "id": "cargo",
+  "name": "C-130 Heavy Cargo",
+  "mass": 34000,
+  "wingArea": 162.0,
+  "aspectRatio": 10.1,
+  "maxThrust": 180000,
+  "rollRate": 0.5,
+  "pitchRate": 0.45,
+  "yawRate": 0.25,
+  "dragCoefficientZero": 0.026,
+  "liftCoefficientMax": 1.9,
+  "emptyWeight": 22000,
+  "maxFuelCapacity": 15000,
+  "dimensions": {
+    "span": 40.4,
+    "length": 29.8,
+    "height": 11.6
+  },
+  "camera": {
+    "offsetX": 0.0,
+    "offsetY": 8.5,
+    "offsetZ": -32.0,
+    "lookAheadDistance": 12.0
+  },
+  "modelType": "built-in",
+  "modelPath": ""
+}
