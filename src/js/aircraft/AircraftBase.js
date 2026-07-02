@@ -125,9 +125,14 @@ export class AircraftBase {
     }
 
     // 2. Animate propeller rotations (Trainer aircraft only)
+    const rpmScaling = (this.controls.throttle * 75 + 5) * this.engineSpool + (this.airspeed * 0.4 * (1.0 - this.engineSpool));
     if (this.propellerGroup) {
-      const rpmScaling = (this.controls.throttle * 75 + 5) * this.engineSpool + (this.airspeed * 0.4 * (1.0 - this.engineSpool));
       this.propellerGroup.rotation.z += rpmScaling * deltaTime;
+    }
+    if (this.cargoPropellers) {
+      this.cargoPropellers.forEach((prop) => {
+        prop.rotation.z += rpmScaling * deltaTime;
+      });
     }
 
     // 3. Align visual landing gear group visibility to retraction state

@@ -240,37 +240,57 @@
     <div id="hud-menu-content">
       <h2>Hangar Selection</h2>
       
-      <div class="aircraft-cards-container">
-        <!-- Aircraft Card 1: Trainer -->
-        <div class="aircraft-card selected" data-id="trainer">
-          <div class="card-title">T-1 Basic Trainer</div>
-          <p class="description">A standard single-engine civilian propeller aircraft. Highly stable, forgiving, and ideal for introductory flight practice.</p>
-          <div class="specs">
-            <div><span>Weight:</span> 1,100 kg</div>
-            <div><span>Max Thrust:</span> 4.5 kN</div>
-            <div><span>Roll Rate:</span> 1.5 rad/s</div>
+      <div class="hangar-layout">
+        <!-- Left Side: Plane Selection Cards and Weather Buttons -->
+        <div class="hangar-controls">
+          <div class="aircraft-cards-container">
+            <!-- Aircraft Card 1: Trainer -->
+            <div class="aircraft-card selected" data-id="trainer">
+              <div class="card-title">T-1 Trainer</div>
+              <p class="description">Single-prop. Stable and forgiving.</p>
+            </div>
+
+            <!-- Aircraft Card 2: Fighter -->
+            <div class="aircraft-card" data-id="fighter">
+              <div class="card-title">F-18 Fighter</div>
+              <p class="description">Twin turbofan. Agile, supersonic.</p>
+            </div>
+
+            <!-- Aircraft Card 3: Stunt -->
+            <div class="aircraft-card" data-id="stunt">
+              <div class="card-title">S-2 Stunt</div>
+              <p class="description">Acrobatic biplane. Highly maneuverable.</p>
+            </div>
+
+            <!-- Aircraft Card 4: Cargo -->
+            <div class="aircraft-card" data-id="cargo">
+              <div class="card-title">C-130 Cargo</div>
+              <p class="description">Four-engine transport. Sluggish but stable.</p>
+            </div>
+          </div>
+
+          <!-- Weather Configuration Selection -->
+          <div id="menu-weather-section">
+            <h3>Weather Conditions</h3>
+            <div class="weather-selector-row">
+              <button class="weather-btn selected" data-weather="clear">☼ CLEAR & CALM</button>
+              <button class="weather-btn" data-weather="windy">☁ GUSTY WIND</button>
+              <button class="weather-btn" data-weather="stormy">⛈ SEVERE STORM</button>
+            </div>
           </div>
         </div>
 
-        <!-- Aircraft Card 2: Fighter -->
-        <div class="aircraft-card" data-id="fighter">
-          <div class="card-title">F-18 Strike Fighter</div>
-          <p class="description">A twin-engine, multirole military supersonic jet. Capable of extreme roll speeds, climbs, and tactical air maneuvering.</p>
-          <div class="specs">
-            <div><span>Weight:</span> 9,500 kg</div>
-            <div><span>Max Thrust:</span> 85.0 kN</div>
-            <div><span>Roll Rate:</span> 3.0 rad/s</div>
+        <!-- Right Side: 3D Preview Panel -->
+        <div class="hangar-preview-panel">
+          <div class="preview-canvas-container">
+            <canvas id="hangar-preview-canvas"></canvas>
           </div>
-        </div>
-      </div>
-
-      <!-- Weather Configuration Selection -->
-      <div id="menu-weather-section">
-        <h3>Weather Conditions</h3>
-        <div class="weather-selector-row">
-          <button class="weather-btn selected" data-weather="clear">☼ CLEAR & CALM</button>
-          <button class="weather-btn" data-weather="windy">☁ GUSTY WIND</button>
-          <button class="weather-btn" data-weather="stormy">⛈ SEVERE STORM</button>
+          <div id="preview-specs-panel">
+            <h4>Aircraft Specifications</h4>
+            <div><span>Engine Type:</span> <span id="spec-engine">Single Piston</span></div>
+            <div><span>Max Thrust:</span> <span id="spec-thrust">6.8 kN</span></div>
+            <div><span>Roll Authority:</span> <span id="spec-roll">1.5 rad/s</span></div>
+          </div>
         </div>
       </div>
 
