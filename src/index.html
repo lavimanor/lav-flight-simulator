@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Desktop Flight Simulator</title>
   <link rel="stylesheet" href="css/main.css">
-  <!-- Local Import Map enables loading npm modules locally without external CDNs or bundlers -->
   <script type="importmap">
     {
       "imports": {
@@ -16,24 +15,21 @@
   </script>
 </head>
 <body>
-  <!-- Physiological Vision Overlays -->
+  <!-- Physiological Overlays -->
   <div id="hud-blackout-overlay" class="fade-overlay"></div>
   <div id="hud-redout-overlay" class="fade-overlay"></div>
-
   <div id="canvas-container"></div>
-  
-  <!-- Interactive Pre-Flight Main Menu Overlay -->
+
+  <!-- Pre-Flight Main Menu Overlay -->
   <div id="main-menu-overlay">
     <div id="main-menu-content">
       <h1 class="menu-brand">VIRTUAL FLIGHT</h1>
       <p class="menu-tagline">ADVANCED DESKTOP FLIGHT DYNAMICS SIMULATOR</p>
-      
       <div class="menu-main-actions">
         <button id="menu-btn-fly" class="menu-primary-btn">▶ FLY NOW</button>
         <button id="menu-btn-hangar" class="menu-secondary-btn">✈ HANGAR SELECTION</button>
         <button id="menu-btn-settings" class="menu-secondary-btn">⚙ PILOT CONFIGURATION</button>
       </div>
-
       <div class="menu-footer">
         <span>ELECTRON CLIENT v1.0.0</span>
         <span>DYNAMICS ENGINE ACTIVE</span>
@@ -41,11 +37,10 @@
     </div>
   </div>
 
-  <!-- Interactive Settings Dialog Modal -->
+  <!-- Pilot Settings Modal -->
   <div id="hud-settings-modal" class="hidden">
     <div id="hud-settings-content">
       <h2>Pilot Configuration</h2>
-      
       <div class="settings-group">
         <h3>Audio Channels</h3>
         <div class="setting-row">
@@ -73,7 +68,6 @@
           <input type="checkbox" id="checkbox-mute-sound" style="width: auto; accent-color: #00ff66;">
         </div>
       </div>
-
       <div class="settings-group">
         <h3>Simulation Parameters</h3>
         <div class="setting-row">
@@ -93,7 +87,6 @@
           <input type="checkbox" id="checkbox-ils-display" style="width: auto; accent-color: #00ff66;" checked>
         </div>
       </div>
-
       <div class="menu-action-row">
         <button id="settings-save-btn">SAVE CONFIG</button>
         <button id="settings-close-btn">CANCEL</button>
@@ -101,10 +94,8 @@
     </div>
   </div>
 
-  <!-- Modern Flight HUD Overlay -->
+  <!-- Flight HUD Overlay -->
   <div id="hud-overlay" style="visibility: hidden;">
-    
-    <!-- Top Heading Indicator -->
     <div id="hud-heading-container" class="hud-box">
       <div id="hud-heading-ticker">▼</div>
       <div id="hud-heading-val">000°</div>
@@ -112,12 +103,8 @@
         <div id="hud-heading-tape-scroll"></div>
       </div>
     </div>
-
-    <!-- Interface Control Buttons -->
     <button id="menu-toggle-btn">✈ SELECT AIRCRAFT</button>
     <button id="hud-btn-mainmenu">🏠 MAIN MENU</button>
-
-    <!-- Left Airspeed Tape -->
     <div id="hud-speed-container" class="hud-box">
       <div class="hud-title">SPD</div>
       <div class="hud-numerical-readout">
@@ -125,8 +112,6 @@
       </div>
       <div class="tape-bar-indicator left-aligned"></div>
     </div>
-
-    <!-- Right Altitude Tape -->
     <div id="hud-altitude-container" class="hud-box">
       <div class="hud-title">ALT</div>
       <div class="hud-numerical-readout">
@@ -134,45 +119,31 @@
       </div>
       <div class="tape-bar-indicator right-aligned"></div>
     </div>
-
-    <!-- Stacked Tactical Left Sidebar Warnings Panel -->
     <div id="hud-warnings-panel">
-      <!-- Engine toggles & Speedbrake HUD alerts -->
       <div id="hud-engine-warning" class="hud-alert-box engine-off">ENG SHUTDOWN - PRESS 'I' TO IGNITE</div>
       <div id="hud-airbrakes-warning" class="hud-alert-box airbrakes hidden">AIRBRAKES ACTIVE</div>
       <div id="hud-ab-warning" class="hud-alert-box afterburner hidden">AFTERBURNER WET</div>
-
       <div id="hud-stall-warning" class="hud-alert-box hidden">STALL</div>
       <div id="hud-spin-warning" class="hud-alert-box hidden">SPIN ENTRY</div>
       <div id="hud-brakes-warning" class="hud-alert-box brakes hidden">BRAKES ON</div>
       <div id="hud-scrape-warning" class="hud-alert-box scrape hidden">BELLY SCRAPE</div>
     </div>
-
-    <!-- Centered Emergency Crash Panel -->
     <div id="hud-crash-panel">
-      <!-- Flashing Crash recovery HUD prompt -->
       <div id="hud-crash-warning" class="hud-alert-box crash hidden">
         <h2>** CRASHED **</h2>
         <p>PRESS 'R' TO RESPAWN ON RUNWAY</p>
       </div>
     </div>
-
-    <!-- Center Pitch & Roll Ladder Reticle -->
     <div id="hud-center-sight">
       <div id="hud-aircraft-sight">
         <span class="left-wing"></span>
         <span class="center-dot"></span>
         <span class="right-wing"></span>
       </div>
-      
-      <!-- Modular Flight Path Vector (FPV) Reticle -->
       <div id="hud-fpv" class="hud-fpv-reticle">
         <span class="top-fin"></span>
       </div>
-
-      <!-- Instrument Landing System (ILS) Indicator Grid -->
       <div id="hud-ils-container" class="hidden">
-        <!-- Glideslope scale (vertical approach deviation) -->
         <div class="ils-vertical-scale">
           <span class="dot">·</span>
           <span class="dot">·</span>
@@ -181,7 +152,6 @@
           <span class="dot">·</span>
           <div id="hud-ils-glideslope"></div>
         </div>
-        <!-- Localizer scale (horizontal centerline deviation) -->
         <div class="ils-horizontal-scale">
           <span class="dot">·</span>
           <span class="dot">·</span>
@@ -191,11 +161,8 @@
           <div id="hud-ils-localizer"></div>
         </div>
       </div>
-
       <div id="hud-pitch-ladder"></div>
     </div>
-
-    <!-- Bottom Flight Data Panel -->
     <div id="hud-data-panel" class="hud-box">
       <div class="hud-row">
         <span class="label">THR</span>
@@ -212,8 +179,6 @@
         <span class="label">V/S</span>
         <span id="hud-vs-val" class="value">0 FPM</span>
       </div>
-      
-      <!-- Takeoff / Landing configuration indicators -->
       <div class="hud-row advanced-row">
         <span class="label">GEAR</span>
         <span id="hud-gear-val" class="value">DN</span>
@@ -222,8 +187,6 @@
         <span class="label">FLAPS</span>
         <span id="hud-flaps-val" class="value">0%</span>
       </div>
-
-      <!-- Advanced Systems Telemetry -->
       <div class="hud-row advanced-row">
         <span class="label">FUEL</span>
         <span id="hud-fuel-val" class="value">0 kg</span>
@@ -237,48 +200,19 @@
         <span id="hud-rings-val" class="value">0 / 4</span>
       </div>
     </div>
-
-    <!-- Stunt Ring Clear Alert -->
-    <div id="hud-ring-clear-alert" class="hidden">
-      <span>✦ RING CLEARED ✦</span>
-    </div>
   </div>
 
-  <!-- Interactive Hangar Selection Modal -->
+  <!-- Interactive Hangar selection and Weather Modal -->
   <div id="hud-menu-modal" class="hidden">
     <div id="hud-menu-content">
       <h2>Hangar Selection</h2>
       
       <div class="hangar-layout">
-        <!-- Left Side: Plane Selection Cards and Weather Buttons -->
+        <!-- Selection Sidebar Column -->
         <div class="hangar-controls">
           <div class="aircraft-cards-container">
-            <!-- Aircraft Card 1: Trainer -->
-            <div class="aircraft-card selected" data-id="trainer">
-              <div class="card-title">T-1 Trainer</div>
-              <p class="description">Single-prop. Stable and forgiving.</p>
-            </div>
-
-            <!-- Aircraft Card 2: Fighter -->
-            <div class="aircraft-card" data-id="fighter">
-              <div class="card-title">F-18 Fighter</div>
-              <p class="description">Twin turbofan. Agile, supersonic.</p>
-            </div>
-
-            <!-- Aircraft Card 3: Stunt -->
-            <div class="aircraft-card" data-id="stunt">
-              <div class="card-title">S-2 Stunt</div>
-              <p class="description">Acrobatic biplane. Highly maneuverable.</p>
-            </div>
-
-            <!-- Aircraft Card 4: Cargo -->
-            <div class="aircraft-card" data-id="cargo">
-              <div class="card-title">C-130 Cargo</div>
-              <p class="description">Four-engine transport. Sluggish but stable.</p>
-            </div>
+            <!-- Autogenerated aircraft cards loaded at runtime -->
           </div>
-
-          <!-- Weather Configuration Selection -->
           <div id="menu-weather-section">
             <h3>Weather Conditions</h3>
             <div class="weather-selector-row">
@@ -289,7 +223,7 @@
           </div>
         </div>
 
-        <!-- Right Side: 3D Preview Panel -->
+        <!-- 3D Preview Column Panel -->
         <div class="hangar-preview-panel">
           <div class="preview-canvas-container">
             <canvas id="hangar-preview-canvas"></canvas>

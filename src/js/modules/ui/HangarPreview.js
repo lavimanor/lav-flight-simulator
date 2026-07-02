@@ -37,7 +37,6 @@ export class HangarPreview {
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    // Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
     this.scene.add(ambientLight);
 
@@ -45,7 +44,7 @@ export class HangarPreview {
     dirLight.position.set(10, 20, 10);
     this.scene.add(dirLight);
 
-    const fillLight = new THREE.DirectionalLight(0x00ff66, 0.25); // Soft sci-fi neon green ground fill
+    const fillLight = new THREE.DirectionalLight(0x00ff66, 0.25);
     fillLight.position.set(-10, -5, -10);
     this.scene.add(fillLight);
 
@@ -55,21 +54,15 @@ export class HangarPreview {
     this.animate();
   }
 
-  /**
-   * Clears old models and procedurally builds the highlighted aircraft in mock state.
-   * @param {string} configId 
-   */
   setAircraft(configId) {
     if (!this.scene) return;
 
-    // Safety check: if configurations are still loading asynchronously, defer rendering [3]
     const activeConfig = AircraftConfig[configId];
     if (!activeConfig) {
       console.warn(`[HangarPreview] Configuration for '${configId}' is not loaded yet. Deferring rendering.`);
       return;
     }
 
-    // Clear previous mesh groups
     while (this.previewGroup.children.length > 0) {
       const child = this.previewGroup.children[0];
       this.previewGroup.remove(child);
@@ -78,7 +71,6 @@ export class HangarPreview {
     this.propellerGroup = null;
     this.cargoPropellers = [];
 
-    // Assemble mock aircraft structure
     const mockAircraft = {
       config: activeConfig,
       group: new THREE.Group(),
@@ -91,10 +83,8 @@ export class HangarPreview {
       mockAircraft.group.add(mockAircraft.afterburnerGroup);
     }
 
-    // Procedurally render raw mesh
     AircraftMeshBuilder.build(mockAircraft);
 
-    // Save propeller references for preview animations
     if (mockAircraft.propellerGroup) {
       this.propellerGroup = mockAircraft.propellerGroup;
     }
@@ -102,11 +92,8 @@ export class HangarPreview {
       this.cargoPropellers = mockAircraft.cargoPropellers;
     }
 
-    // Scale models so they look consistently centered in the viewport
     const scale = configId === 'cargo' ? 0.35 : (configId === 'fighter' ? 0.65 : 0.8);
     mockAircraft.group.scale.set(scale, scale, scale);
-    
-    // Tilt slightly forward/side for cinematic angle
     mockAircraft.group.rotation.set(0.15, -Math.PI / 4, -0.05);
 
     this.previewGroup.add(mockAircraft.group);
@@ -119,7 +106,6 @@ export class HangarPreview {
       this.previewGroup.rotation.y += 0.008;
     }
 
-    // Spin preview propellers
     const time = performance.now() * 0.005;
     if (this.propellerGroup) {
       this.propellerGroup.rotation.z = time;

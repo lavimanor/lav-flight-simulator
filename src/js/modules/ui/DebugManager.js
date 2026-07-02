@@ -3,14 +3,11 @@ import { AircraftConfig } from '../../aircraft/AircraftConfig.js';
 
 export class DebugManager {
   constructor() {
-    // SCRIPT TOGGLE FLAG: Set to true to display the debug panel, or false to fully disable/remove it [3].
-    this.enabled = false;
-
+    this.enabled = false; // Set to true to enable the debug panel
     this.engine = null;
     this.aircraftManager = null;
     this.panelElement = null;
     this.textarea = null;
-    
     this.collisionBoxMesh = null;
     this.synced = false;
     this.currentAircraftId = null;
@@ -19,7 +16,6 @@ export class DebugManager {
   init(engine) {
     this.engine = engine;
     if (!this.enabled) return;
-
     this.buildDebugUI();
   }
 
@@ -143,7 +139,6 @@ export class DebugManager {
     const aircraft = this.aircraftManager.activeAircraft;
     const config = aircraft.config;
 
-    // 1. Extract values from DOM sliders
     const sx = parseFloat(document.getElementById('debug-scale-x').value);
     const sy = parseFloat(document.getElementById('debug-scale-y').value);
     const sz = parseFloat(document.getElementById('debug-scale-z').value);
@@ -158,7 +153,6 @@ export class DebugManager {
 
     const clearance = parseFloat(document.getElementById('debug-clearance').value);
 
-    // 2. Update labels
     document.getElementById('lbl-scale-x').textContent = sx.toFixed(2);
     document.getElementById('lbl-scale-y').textContent = sy.toFixed(2);
     document.getElementById('lbl-scale-z').textContent = sz.toFixed(2);
@@ -173,13 +167,11 @@ export class DebugManager {
 
     document.getElementById('lbl-clearance').textContent = `${clearance.toFixed(2)}m`;
 
-    // 3. Apply to Config object dynamically [3]
     config.modelScale = { x: sx, y: sy, z: sz };
     config.modelRotation = { x: rx, y: ry, z: rz };
     config.modelPosition = { x: px, y: py, z: pz };
     config.groundClearanceOffset = clearance;
 
-    // 4. Update active 3D Model transformation matrix directly [3, 4]
     if (aircraft.visualGroup) {
       aircraft.visualGroup.scale.set(sx, sy, sz);
       aircraft.visualGroup.rotation.set(
@@ -190,23 +182,17 @@ export class DebugManager {
       aircraft.visualGroup.position.set(px, py, pz);
     }
 
-    // 5. Redraw the collision box outline to match clearance changes [3, 4]
     this.updateCollisionBox(aircraft);
 
-    // 6. Output updated config profile
     if (this.textarea) {
       this.textarea.value = JSON.stringify(config, null, 2);
     }
   }
 
-  /**
-   * Generates a glowing green wireframe boundary matching the aircraft JSON dimensions [3, 4].
-   */
   updateCollisionBox(aircraft) {
     const config = aircraft.config;
     if (!config || !config.dimensions) return;
 
-    // Clear old wireframe instance
     if (this.collisionBoxMesh) {
       aircraft.group.remove(this.collisionBoxMesh);
       this.collisionBoxMesh.geometry.dispose();
@@ -221,7 +207,6 @@ export class DebugManager {
     const geo = new THREE.BoxGeometry(span, height, length);
     const edges = new THREE.EdgesGeometry(geo);
     
-    // Glowing neon green line material
     const mat = new THREE.LineBasicMaterial({ 
       color: 0x00ff66, 
       linewidth: 2.0 
@@ -229,16 +214,12 @@ export class DebugManager {
 
     this.collisionBoxMesh = new THREE.LineSegments(edges, mat);
     
-    // Align bottom edge of the box with the wheels resting on the runway [3, 4]
     const clearance = config.groundClearanceOffset ?? 1.2;
     this.collisionBoxMesh.position.set(0, (height / 2) - clearance, 0);
 
     aircraft.group.add(this.collisionBoxMesh);
   }
 
-  /**
-   * Sync sliders with currently active aircraft configs on spawn.
-   */
   syncSliders() {
     if (!this.panelElement || !this.enabled) return;
 
@@ -269,20 +250,17 @@ export class DebugManager {
 
     document.getElementById('debug-clearance').value = clearance;
 
-    // Draw the green outline box
     this.updateCollisionBox(aircraft);
     this.applyDebugValues();
   }
 
   update(deltaTime) {
-    // Synchronize UI once when active plane spawned
     const aircraftManager = this.engine.moduleManager.get('Aircraft');
     if (aircraftManager && aircraftManager.activeAircraft && !this.synced) {
       this.syncSliders();
       this.synced = true;
     }
     
-    // Reset sync flag if aircraft swapped out
     if (aircraftManager && aircraftManager.activeAircraft) {
       if (this.currentAircraftId !== aircraftManager.activeAircraft.config.id) {
         this.currentAircraftId = aircraftManager.activeAircraft.config.id;

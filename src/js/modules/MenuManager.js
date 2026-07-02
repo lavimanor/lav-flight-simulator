@@ -23,14 +23,11 @@ export class MenuManager {
     this.modal = document.getElementById('hud-menu-modal');
     this.spawnBtn = document.getElementById('menu-spawn-btn');
     this.closeBtn = document.getElementById('menu-close-btn');
-    // Render dynamic plane list selection cards from the registry [3, 7]
-    this.renderAircraftCards();
-
-    this.cards = Array.from(document.querySelectorAll('.aircraft-card'));
     this.weatherBtns = Array.from(document.querySelectorAll('.weather-btn'));
+
+    this.renderAircraftCards();
     this.bindEvents();
-    
-    // Initialize 3D pre-flight rotating previews
+
     if (this.preview) {
       this.preview.init();
       this.preview.setAircraft(this.selectedAircraftId);
@@ -54,7 +51,6 @@ export class MenuManager {
         card.classList.add('selected');
         this.selectedAircraftId = card.getAttribute('data-id');
 
-        // Dynamically shift active 3D preview model and specs on click
         if (this.preview) {
           this.preview.setAircraft(this.selectedAircraftId);
         }
@@ -114,6 +110,41 @@ export class MenuManager {
     this.closeMenu();
   }
 
+  renderAircraftCards() {
+    const container = document.querySelector('.aircraft-cards-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+    
+    if (!this.aircraftManager) {
+      this.aircraftManager = this.engine.moduleManager.get('Aircraft');
+    }
+    const configs = this.aircraftManager ? this.aircraftManager.configs : {};
+    
+    Object.keys(configs).forEach((id, index) => {
+      const config = configs[id];
+      const card = document.createElement('div');
+      card.className = `aircraft-card${index === 0 ? ' selected' : ''}`;
+      card.setAttribute('data-id', id);
+
+      const desc = config.description || `Configured ${config.name} model.`;
+
+      card.innerHTML = `
+        <div class="card-title">${config.name}</div>
+        <p class="description">${desc}</p>
+      `;
+      container.appendChild(card);
+    });
+
+    const firstId = Object.keys(configs)[0];
+    if (firstId) {
+      this.selectedAircraftId = firstId;
+    }
+
+    this.cards = Array.from(document.querySelectorAll('.aircraft-card'));
+    this.bindEvents();
+  }
+
   updateSpecsPanel() {
     const specEngine = document.getElementById('spec-engine');
     const specThrust = document.getElementById('spec-thrust');
@@ -159,44 +190,6 @@ export class MenuManager {
       specThrust.textContent = '191.0 kN';
       specRoll.textContent = '2.8 rad/s';
     }
-  }
-
-  renderAircraftCards() {
-    const container = document.querySelector('.aircraft-cards-container');
-    if (!container) return;
-
-    container.innerHTML = ''; // Clear hardcoded card elements
-    
-    if (!this.aircraftManager) {
-      this.aircraftManager = this.engine.moduleManager.get('Aircraft');
-    }
-    const configs = this.aircraftManager ? this.aircraftManager.configs : {};
-    
-    Object.keys(configs).forEach((id, index) => {
-      const config = configs[id];
-      const card = document.createElement('div');
-      card.className = `aircraft-card${index === 0 ? ' selected' : ''}`;
-      card.setAttribute('data-id', id);
-
-      // Extract brief description or generate a fallback
-      const desc = config.description || `Configured ${config.name} model.`;
-
-      card.innerHTML = `
-        <div class="card-title">${config.name}</div>
-        <p class="description">${desc}</p>
-      `;
-      container.appendChild(card);
-    });
-
-    // Default to the first registered plane
-    const firstId = Object.keys(configs)[0];
-    if (firstId) {
-      this.selectedAircraftId = firstId;
-    }
-
-    // Capture newly rendered elements in our array and bind listeners [3, 7]
-    this.cards = Array.from(document.querySelectorAll('.aircraft-card'));
-    this.bindEvents();
   }
 
   update(deltaTime) {

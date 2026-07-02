@@ -6,7 +6,6 @@ export class ModuleManager {
     this.engine = engine;
     this.modules = new Map();
   }
-
   register(name, moduleInstance) {
     if (!name || typeof name !== 'string') {
       throw new Error("Invalid registration: module name must be a non-empty string.");
@@ -18,11 +17,9 @@ export class ModuleManager {
     this.modules.set(name, moduleInstance);
     this.engine.addModule(moduleInstance);
   }
-
   get(name) {
     return this.modules.get(name);
   }
-
   initAll() {
     for (const [name, module] of this.modules.entries()) {
       if (typeof module.init === 'function') {

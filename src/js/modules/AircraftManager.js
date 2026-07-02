@@ -31,7 +31,7 @@ export class AircraftManager {
   }
 
   async loadAllAircraftConfigs() {
-    let ids = ['trainer', 'fighter', 'stunt', 'cargo', 'f16', 'f22', 'f35', 'b2']; // Static fallback list
+    let ids = ['trainer', 'fighter', 'stunt', 'cargo']; // Fallback list
     
     // Dynamic scan via Electron IPC bridge if available
     if (window.electronAPI && typeof window.electronAPI.readAircraftDirectory === 'function') {
@@ -92,10 +92,7 @@ export class AircraftManager {
       spawnPos.y = 180.0 + (config.groundClearanceOffset ?? 1.2);
     }
     this.activeAircraft.spawn(this.engine.scene, spawnPos);
-
-    // Apply a default 0% throttle for ground takeoff roll sequence
     this.activeAircraft.controls.throttle = 0.0;
-
     console.log(`[AircraftManager] Spawned: ${config.name} resting on runway coordinates X:${spawnPos.x} Y:${spawnPos.y} Z:${spawnPos.z}`);
   }
 
