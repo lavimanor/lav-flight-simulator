@@ -142,6 +142,18 @@ export class SettingsMenu {
     if (this.sliders.effects) this.sliders.effects.value = effects;
     if (this.checkboxMute) this.checkboxMute.checked = muted;
 
+    // Restore Simulation Parameter toggles (default to enabled when no saved value exists).
+    // These were previously persisted on Save but never read back, so they reset every launch.
+    const restoreToggle = (checkbox, storageKey) => {
+      if (!checkbox) return;
+      const saved = localStorage.getItem(storageKey);
+      checkbox.checked = (saved === null) ? true : (saved === 'true');
+    };
+    restoreToggle(this.checkboxGEffects, 'flight_g_effects');
+    restoreToggle(this.checkboxCamShake, 'flight_cam_shake');
+    restoreToggle(this.checkboxWind, 'flight_wind_effects');
+    restoreToggle(this.checkboxILS, 'flight_ils_display');
+
     // Update displays
     Object.keys(this.sliders).forEach((key) => {
       if (this.displays[key] && this.sliders[key]) {

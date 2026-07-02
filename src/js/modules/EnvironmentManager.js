@@ -6,6 +6,11 @@ export class EnvironmentManager {
     this.sunLight = null;
     this.ambientLight = null;
     this.hemisphereLight = null;
+    this.sunTarget = null;
+    this.aircraftManager = null;
+
+    // Fixed sun direction offset; the light rig slides to follow the aircraft so shadows stay in view.
+    this.sunOffset = new THREE.Vector3(500, 1000, 500);
   }
 
   init(engine) {
@@ -27,8 +32,13 @@ export class EnvironmentManager {
 
     // Sun light for directional illumination and crisp shadows
     this.sunLight = new THREE.DirectionalLight(0xfffaed, 1.2);
-    this.sunLight.position.set(500, 1000, 500);
+    this.sunLight.position.copy(this.sunOffset);
     this.sunLight.castShadow = true;
+
+    // Explicit target so the light (and its shadow frustum) can be re-aimed at the aircraft each frame
+    this.sunTarget = new THREE.Object3D();
+    scene.add(this.sunTarget);
+    this.sunLight.target = this.sunTarget;
 
     // Shadow map tuning optimized for flight sim scale
     this.sunLight.shadow.mapSize.width = 2048;
@@ -52,6 +62,16 @@ export class EnvironmentManager {
   }
 
   update(deltaTime) {
-    // Dynamic sun rotation loops can be safely configured here
+    if (!this.engine || !this.engine.moduleManager) return;
+
+    if (!this.aircraftManager) {
+      this.aircraftManager = this.engine.moduleManager.get('Aircraft');
+    }
+    if (!this.aircraftManager || !this.aircraftManager.activeAircraft) return;
+
+    // Slide the sun rig so the shadow frustum keeps covering the aircraft (shadow bounds are only ±250m).
+    const pos = this.aircraftManager.activeAircraft.position;
+    if (this.sunTarget) this.sunTarget.position.copy(pos);
+    if (this.sunLight) this.sunLight.position.copy(pos).add(this.sunOffset);
   }
 }

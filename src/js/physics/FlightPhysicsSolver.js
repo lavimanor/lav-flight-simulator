@@ -40,14 +40,18 @@ export class FlightPhysicsSolver {
 
     const weatherManager = aircraft.engine?.moduleManager?.get('Weather');
     const windVector = (weatherManager && windEnabled) ? weatherManager.wind : new THREE.Vector3(0, 0, 0);
-    const turbulenceVector = (weatherManager && windEnabled) ? weatherManager.currentGust : new THREE.Vector3(0, 0, 0);
 
     aircraft.altitude = aircraft.position.y;
     const airDensity = Atmosphere.getDensity(aircraft.position.y);
     const speedOfSound = Atmosphere.getSpeedOfSound(aircraft.position.y);
 
-    // Resolve procedural terrain elevation underneath aircraft coordinates
-    const terrainHeight = this.getTerrainHeightAt(aircraft.position.x, aircraft.position.z);
+    // Resolve procedural terrain elevation underneath aircraft coordinates.
+    // Delegate to the TerrainManager so collision height matches the rendered mesh exactly;
+    // fall back to the local generator only if the module is unavailable.
+    const terrainManager = aircraft.engine?.moduleManager?.get('Terrain');
+    const terrainHeight = terrainManager
+      ? terrainManager.getHeightAt(aircraft.position.x, aircraft.position.z)
+      : this.getTerrainHeightAt(aircraft.position.x, aircraft.position.z);
     const groundClearance = terrainHeight + 1.2;
 
     // 5. Water Surface Splashdown and Sinking Animation
@@ -350,7 +354,8 @@ export class FlightPhysicsSolver {
     // Match the flat airport runway plateau exactly: 240m wide, 3600m long corridor is flat at 180.0m
     const scale = this.elevationScale;
     const n = this.noise.fbm2D(worldX * scale, worldZ * scale, 4);
-    const rawHeight = n * this.maxElevation;
+    // Apply the same power curve as TerrainManager.getHeightAt so this fallback stays in sync with the mesh
+    const rawHeight = Math.pow(n, 1.4) * this.maxElevation;
 
     const distToCenter = Math.abs(worldX);
     if (worldZ > -1500 && worldZ < 2500) {
