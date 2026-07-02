@@ -1,0 +1,44 @@
+{
+  "id": "f22",
+  "name": "F-22 Raptor",
+  "mass": 15000,
+  "wingArea": 78.04,
+  "aspectRatio": 3.1,
+  "maxThrust": 156000,
+  "rollRate": 3.2,
+  "pitchRate": 2.0,
+  "yawRate": 0.9,
+  "dragCoefficientZero": 0.015,
+  "liftCoefficientMax": 1.85,
+  "emptyWeight": 9700,
+  "maxFuelCapacity": 8200,
+  "dimensions": {
+    "span": 13.56,
+    "length": 18.9,
+    "height": 5.08
+  },
+  "camera": {
+    "offsetX": 0.0,
+    "offsetY": 5.2,
+    "offsetZ": -19.5,
+    "lookAheadDistance": 8.5
+  },
+  "modelType": "built-in",
+  "modelPath": "",
+  "modelScale": {
+    "x": 1.0,
+    "y": 1.0,
+    "z": 1.0
+  },
+  "modelRotation": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "modelPosition": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "groundClearanceOffset": 1.2
+}

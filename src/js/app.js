@@ -12,6 +12,8 @@ import { TerrainManager } from './modules/TerrainManager.js';
 import { WeatherManager } from './modules/WeatherManager.js';
 import { SoundManager } from './modules/SoundManager.js';
 import { SettingsMenu } from './modules/ui/SettingsMenu.js';
+import { DebugManager } from './modules/ui/DebugManager.js';
+import { ObstacleManager } from './modules/ObstacleManager.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   try {
@@ -72,7 +74,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsMenu = new SettingsMenu();
     moduleManager.register('Settings', settingsMenu);
 
-    // Initialize all modules sequentially
+    const debugManager = new DebugManager();
+    moduleManager.register('Debug', debugManager);
+
+    // 15. Register Obstacles Manager
+    const obstacleManager = new ObstacleManager();
+    moduleManager.register('Obstacles', obstacleManager);
+
     moduleManager.initAll();
 
     // 15. Start the global simulation rendering ticking loop

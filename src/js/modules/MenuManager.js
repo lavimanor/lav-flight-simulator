@@ -23,10 +23,13 @@ export class MenuManager {
     this.modal = document.getElementById('hud-menu-modal');
     this.spawnBtn = document.getElementById('menu-spawn-btn');
     this.closeBtn = document.getElementById('menu-close-btn');
+    // Render dynamic plane list selection cards from the registry [3, 7]
+    this.renderAircraftCards();
+
     this.cards = Array.from(document.querySelectorAll('.aircraft-card'));
     this.weatherBtns = Array.from(document.querySelectorAll('.weather-btn'));
     this.bindEvents();
-
+    
     // Initialize 3D pre-flight rotating previews
     if (this.preview) {
       this.preview.init();
@@ -139,7 +142,61 @@ export class MenuManager {
       specEngine.textContent = 'Quad Turboprop';
       specThrust.textContent = '180.0 kN';
       specRoll.textContent = '0.5 rad/s';
+    } else if (config.id === 'f22') {
+      specEngine.textContent = 'Twin Vectoring';
+      specThrust.textContent = '156.0 kN';
+      specRoll.textContent = '3.2 rad/s';
+    } else if (config.id === 'b2') {
+      specEngine.textContent = 'Quad Turbofan';
+      specThrust.textContent = '312.0 kN';
+      specRoll.textContent = '0.45 rad/s';
+    } else if (config.id === 'f16') {
+      specEngine.textContent = 'Single Turbofan';
+      specThrust.textContent = '79.0 kN';
+      specRoll.textContent = '3.2 rad/s';
+    } else if (config.id === 'f35') {
+      specEngine.textContent = 'Single Turbofan';
+      specThrust.textContent = '191.0 kN';
+      specRoll.textContent = '2.8 rad/s';
     }
+  }
+
+  renderAircraftCards() {
+    const container = document.querySelector('.aircraft-cards-container');
+    if (!container) return;
+
+    container.innerHTML = ''; // Clear hardcoded card elements
+    
+    if (!this.aircraftManager) {
+      this.aircraftManager = this.engine.moduleManager.get('Aircraft');
+    }
+    const configs = this.aircraftManager ? this.aircraftManager.configs : {};
+    
+    Object.keys(configs).forEach((id, index) => {
+      const config = configs[id];
+      const card = document.createElement('div');
+      card.className = `aircraft-card${index === 0 ? ' selected' : ''}`;
+      card.setAttribute('data-id', id);
+
+      // Extract brief description or generate a fallback
+      const desc = config.description || `Configured ${config.name} model.`;
+
+      card.innerHTML = `
+        <div class="card-title">${config.name}</div>
+        <p class="description">${desc}</p>
+      `;
+      container.appendChild(card);
+    });
+
+    // Default to the first registered plane
+    const firstId = Object.keys(configs)[0];
+    if (firstId) {
+      this.selectedAircraftId = firstId;
+    }
+
+    // Capture newly rendered elements in our array and bind listeners [3, 7]
+    this.cards = Array.from(document.querySelectorAll('.aircraft-card'));
+    this.bindEvents();
   }
 
   update(deltaTime) {

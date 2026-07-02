@@ -328,4 +328,14 @@ export class SoundManager {
       }
     }
   }
+
+  playChimeSound() {
+    if (this.gearSound && this.gearSound.buffer) {
+      const chime = new THREE.Audio(this.listener);
+      chime.setBuffer(this.gearSound.buffer);
+      chime.setVolume(0.40 * this.effectsVolumeScale);
+      chime.setPlaybackRate(1.6); // High pitch achievement sound
+      chime.play();
+    }
+  }
 }

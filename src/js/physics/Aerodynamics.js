@@ -6,13 +6,21 @@ export class Aerodynamics {
    * @returns {number} CL
    */
   static getLiftCoefficient(aoa, maxCL = 1.4) {
-    let CL = 2.0 * Math.PI * aoa;
-    const criticalStallAngle = 15 * (Math.PI / 180); // 15 degrees in radians
-    
-    if (Math.abs(aoa) > criticalStallAngle) {
-      CL *= 0.5; // Stall region: lift decays 50%
+    const criticalStallAngle = 16 * (Math.PI / 180); // 16 degrees in radians
+    const absAoA = Math.abs(aoa);
+
+    if (absAoA < criticalStallAngle) {
+      // Linear regime
+      const CL = 2.0 * Math.PI * aoa;
+      return Math.max(Math.min(CL, maxCL), -maxCL);
+    } else {
+      // Smooth post-stall decay (stall region)
+      const postStallAoA = absAoA - criticalStallAngle;
+      const decay = Math.cos(Math.min(postStallAoA * 2.5, Math.PI / 2));
+      const stallCL = maxCL * 0.65 * decay; // Decays smoothly
+      const finalCL = Math.max(stallCL, 0.15);
+      return Math.sign(aoa) * finalCL;
     }
-    return Math.max(Math.min(CL, maxCL), -maxCL);
   }
 
   /**

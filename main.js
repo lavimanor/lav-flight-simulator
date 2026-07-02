@@ -1,6 +1,24 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { buildAudioAssets } = require('./scripts/sound-builder.js');
+
+// Two-way IPC handler to dynamically scan local files
+ipcMain.handle('read-aircraft-directory', async () => {
+  try {
+    const dirPath = path.join(__dirname, 'src/data/aircraft');
+    if (!fs.existsSync(dirPath)) return [];
+    
+    // Scan files and filter for JSON extensions only
+    const files = fs.readdirSync(dirPath);
+    return files
+      .filter(file => file.endsWith('.json'))
+      .map(file => path.basename(file, '.json'));
+  } catch (error) {
+    console.error('[main.js] Error reading aircraft directory:', error);
+    return [];
+  }
+});
 
 function createWindow() {
   const mainWindow = new BrowserWindow({

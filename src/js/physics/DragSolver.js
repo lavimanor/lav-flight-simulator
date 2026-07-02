@@ -11,7 +11,7 @@ export class DragSolver {
    * @param {number} dt 
    * @returns {number} Total drag force (Newtons)
    */
-  static solve(aircraft, airDensity, aoaRad, speedOfSound, dt) {
+  static solve(aircraft, airDensity, aoaRad, speedOfSound, relativeHeight, dt) {
     const config = aircraft.config;
 
     // Flaps configuration drag adjustments
@@ -34,7 +34,19 @@ export class DragSolver {
 
     // Resolve drag coefficient using true Angle of Attack (AoA)
     const CL = Aerodynamics.getLiftCoefficient(aoaRad, config.liftCoefficientMax);
-    const CD = Aerodynamics.getDragCoefficient(CL, config.dragCoefficientZero, config.aspectRatio);
+
+    // Induced drag calculation with ground effect reduction
+    const oswaldFactor = 0.8;
+    const dragPolarFactor = 1.0 / (Math.PI * config.aspectRatio * oswaldFactor);
+    const inducedDragCD = dragPolarFactor * CL * CL;
+
+    // Induced drag reduction factor (phi) based on altitude/wingspan ratio
+    const span = config.dimensions.span;
+    const h_over_b = Math.max(relativeHeight, 0) / span;
+    const phi = (16.0 * h_over_b * 16.0 * h_over_b) / (1.0 + 16.0 * h_over_b * 16.0 * h_over_b);
+    const effectiveInducedDragCD = inducedDragCD * Math.min(Math.max(phi, 0.25), 1.0);
+
+    const baseCD = config.dragCoefficientZero + effectiveInducedDragCD;
 
     // Compressibility Wave Drag coefficient rise (sound barrier wave resistance centered near Mach 1.05)
     let waveDragCD = 0.0;
@@ -46,7 +58,7 @@ export class DragSolver {
     }
 
     // Combined drag profile scaling
-    const compositeCD = (CD + waveDragCD) * flapsDragMultiplier * gearDragMultiplier * airbrakeCDMultiplier;
+    const compositeCD = (baseCD + waveDragCD) * flapsDragMultiplier * gearDragMultiplier * airbrakeCDMultiplier;
 
     // Dynamic Pressure: Q = 0.5 * rho * V^2
     const dynamicPressure = 0.5 * airDensity * aircraft.airspeed * aircraft.airspeed;

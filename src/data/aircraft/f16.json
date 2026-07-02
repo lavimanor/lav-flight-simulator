@@ -1,16 +1,16 @@
 {
   "id": "f16",
-  "name": "F-16 Fighting Falcon",
-  "mass": 9200,
-  "wingArea": 27.9,
+  "name": "F-16 Falcon",
+  "mass": 8500,
+  "wingArea": 28.0,
   "aspectRatio": 3.2,
-  "maxThrust": 129000,
-  "rollRate": 3.8,
-  "pitchRate": 2.2,
-  "yawRate": 1.0,
-  "dragCoefficientZero": 0.017,
-  "liftCoefficientMax": 1.85,
-  "emptyWeight": 8500,
+  "maxThrust": 79000,
+  "rollRate": 3.2,
+  "pitchRate": 1.9,
+  "yawRate": 0.8,
+  "dragCoefficientZero": 0.02,
+  "liftCoefficientMax": 1.6,
+  "emptyWeight": 7000,
   "maxFuelCapacity": 3200,
   "dimensions": {
     "span": 9.96,
@@ -19,10 +19,26 @@
   },
   "camera": {
     "offsetX": 0.0,
-    "offsetY": 4.8,
-    "offsetZ": -17.0,
-    "lookAheadDistance": 8.0
+    "offsetY": 4.5,
+    "offsetZ": -16.5,
+    "lookAheadDistance": 7.0
   },
-  "modelType": "custom",
-  "modelPath": "assets/model/f16.glb"
+  "modelType": "built-in",
+  "modelPath": "",
+  "modelScale": {
+    "x": 1.0,
+    "y": 1.0,
+    "z": 1.0
+  },
+  "modelRotation": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "modelPosition": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "groundClearanceOffset": 1.2
 }

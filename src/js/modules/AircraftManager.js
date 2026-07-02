@@ -20,6 +20,7 @@ export class AircraftManager {
       // Update UI panels once coordinates and parameters are loaded
       const menuManager = this.engine.moduleManager.get('Menu');
       if (menuManager) {
+        menuManager.renderAircraftCards(); // Dynamic card redraw [3, 7]
         menuManager.updateSpecsPanel();
         // Trigger the 3D preview to load now that configurations are ready [3, 4]
         if (menuManager.preview) {
@@ -30,7 +31,21 @@ export class AircraftManager {
   }
 
   async loadAllAircraftConfigs() {
-    const ids = ['trainer', 'fighter', 'stunt', 'cargo', 'f35', 'f16', 'b2'];
+    let ids = ['trainer', 'fighter', 'stunt', 'cargo', 'f16', 'f22', 'f35', 'b2']; // Static fallback list
+    
+    // Dynamic scan via Electron IPC bridge if available
+    if (window.electronAPI && typeof window.electronAPI.readAircraftDirectory === 'function') {
+      try {
+        const scannedIds = await window.electronAPI.readAircraftDirectory();
+        if (scannedIds && scannedIds.length > 0) {
+          ids = scannedIds;
+          console.log('[AircraftManager] Dynamically scanned plane profiles:', ids);
+        }
+      } catch (err) {
+        console.warn('[AircraftManager] Electron directory scan failed, utilizing fallback list:', err);
+      }
+    }
+
     for (const id of ids) {
       try {
         const response = await fetch(`data/aircraft/${id}.json`);
@@ -67,22 +82,15 @@ export class AircraftManager {
     if (!config) {
       throw new Error(`Aircraft spawning failed: config ID '${configId}' is not defined.`);
     }
-
-    // Clear any existing active aircraft mesh from the Three.js scene
     if (this.activeAircraft) {
       this.engine.scene.remove(this.activeAircraft.group);
     }
-
-    // Instantiation
     this.activeAircraft = new AircraftBase(config);
-    this.activeAircraft.engine = this.engine; // Secure resolving bridge link
-    
-    // Safety check: ensure Y position rests correctly on 180m runway if spawning near airfield
+    this.activeAircraft.engine = this.engine;
     let spawnPos = position.clone();
     if (spawnPos.z > -1000 && spawnPos.z < 2000 && Math.abs(spawnPos.x) < 100 && spawnPos.y < 185) {
-      spawnPos.y = 181.2;
+      spawnPos.y = 180.0 + (config.groundClearanceOffset ?? 1.2);
     }
-
     this.activeAircraft.spawn(this.engine.scene, spawnPos);
 
     // Apply a default 0% throttle for ground takeoff roll sequence

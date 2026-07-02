@@ -98,6 +98,11 @@ export class AircraftBase {
     this.brakePressure = 0.0;
     this.airbrakeDeployState = 0.0;
 
+    const obstacleManager = this.engine ? this.engine.moduleManager.get('Obstacles') : null;
+    if (obstacleManager) {
+      obstacleManager.resetCourse();
+    }
+
     // Reset takeoff configurations
     this.gearRetracted = false;
     this.flapsStage = 0;
