@@ -45,6 +45,38 @@ export class AircraftManager {
     console.log(`[AircraftManager] Spawned: ${config.name} resting on runway coordinates X:${spawnPos.x} Y:${spawnPos.y} Z:${spawnPos.z}`);
   }
 
+  /**
+   * Loads a dynamic aircraft profile from an external JSON file.
+   * @param {string} jsonUrl - Relative path or URL to the JSON file.
+   */
+  async loadAircraftFromJSON(jsonUrl) {
+    try {
+      const response = await fetch(jsonUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch JSON profile: HTTP ${response.status}`);
+      }
+      
+      const config = await response.json();
+      if (!config.id) {
+        throw new Error("Invalid configuration schema: Missing 'id' field.");
+      }
+
+      // Add configuration to the registry
+      this.configs[config.id] = config;
+      console.log(`[AircraftManager] Registered profile: ${config.name}`);
+
+      // Rebuild UI hangar cards if the UI is loaded
+      const menuManager = this.engine.moduleManager.get('Menu');
+      if (menuManager && typeof menuManager.rebuildAircraftCards === 'function') {
+        menuManager.rebuildAircraftCards();
+      }
+
+      return config;
+    } catch (err) {
+      console.error(`[AircraftManager] Error loading plane config from ${jsonUrl}:`, err);
+    }
+  }
+
   update(deltaTime) {
     if (this.activeAircraft) {
       this.activeAircraft.update(deltaTime);
