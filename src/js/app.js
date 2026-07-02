@@ -75,8 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize all modules sequentially
     moduleManager.initAll();
 
-    aircraftManager.loadAircraftFromJSON('assets/aircraft/stuntplane.json');
-
     // 15. Start the global simulation rendering ticking loop
     engine.start();
 
