@@ -1,10 +1,11 @@
 {
   "id": "f22",
   "name": "F-22 Raptor",
+  "description": "Supersonic twin-engine air superiority stealth fighter. Thrust-vectoring agility, high pitch rates, and rapid acceleration.",
   "mass": 15000,
   "wingArea": 78.04,
   "aspectRatio": 3.1,
-  "maxThrust": 156000,
+  "maxThrust": 185000,
   "rollRate": 3.2,
   "pitchRate": 2.0,
   "yawRate": 0.9,
@@ -13,14 +14,12 @@
   "emptyWeight": 9700,
   "maxFuelCapacity": 8200,
   "isJet": true,
+  "hasAfterburner": true,
+  "engineType": "Twin Vectoring",
   "terminalSpeed": 200.0,
   "stallSpeed": 28.0,
   "pitchGScale": 7.5,
-  "dimensions": {
-    "span": 13.56,
-    "length": 18.9,
-    "height": 5.08
-  },
+  "dimensions": { "span": 13.56, "length": 18.9, "height": 5.08 },
   "camera": {
     "offsetX": 0.0,
     "offsetY": 5.2,

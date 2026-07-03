@@ -23,9 +23,10 @@ export class MenuManager {
     this.modal = document.getElementById('hud-menu-modal');
     this.spawnBtn = document.getElementById('menu-spawn-btn');
     this.closeBtn = document.getElementById('menu-close-btn');
-    this.weatherBtns = Array.from(document.querySelectorAll('.weather-btn'));
 
     this.renderAircraftCards();
+    this.cards = Array.from(document.querySelectorAll('.aircraft-card'));
+    this.weatherBtns = Array.from(document.querySelectorAll('.weather-btn'));
     this.bindEvents();
 
     if (this.preview) {
@@ -45,18 +46,19 @@ export class MenuManager {
     if (this.spawnBtn) {
       this.spawnBtn.addEventListener('click', () => this.handleSpawnAircraft());
     }
+
     this.cards.forEach((card) => {
       card.addEventListener('click', () => {
         this.cards.forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
         this.selectedAircraftId = card.getAttribute('data-id');
-
         if (this.preview) {
           this.preview.setAircraft(this.selectedAircraftId);
         }
         this.updateSpecsPanel();
       });
     });
+
     this.weatherBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
         this.weatherBtns.forEach(b => b.classList.remove('selected'));
@@ -70,7 +72,6 @@ export class MenuManager {
     if (!this.modal) return;
     this.isOpen = true;
     this.modal.classList.remove('hidden');
-
     if (this.preview) {
       this.preview.setAircraft(this.selectedAircraftId);
     }
@@ -101,7 +102,6 @@ export class MenuManager {
       this.aircraftManager.spawnAircraft(this.selectedAircraftId, currentPos);
       
       const newAircraft = this.aircraftManager.activeAircraft;
-      // Only carry over speed and alignment if the previous aircraft was flying safely
       if (prev && !prev.isCrashed) {
         const currentVel = prev.velocity.clone();
         const currentQuat = prev.group.quaternion.clone();
@@ -117,41 +117,6 @@ export class MenuManager {
     this.closeMenu();
   }
 
-  renderAircraftCards() {
-    const container = document.querySelector('.aircraft-cards-container');
-    if (!container) return;
-
-    container.innerHTML = '';
-    
-    if (!this.aircraftManager) {
-      this.aircraftManager = this.engine.moduleManager.get('Aircraft');
-    }
-    const configs = this.aircraftManager ? this.aircraftManager.configs : {};
-    
-    Object.keys(configs).forEach((id, index) => {
-      const config = configs[id];
-      const card = document.createElement('div');
-      card.className = `aircraft-card${index === 0 ? ' selected' : ''}`;
-      card.setAttribute('data-id', id);
-
-      const desc = config.description || `Configured ${config.name} model.`;
-
-      card.innerHTML = `
-        <div class="card-title">${config.name}</div>
-        <p class="description">${desc}</p>
-      `;
-      container.appendChild(card);
-    });
-
-    const firstId = Object.keys(configs)[0];
-    if (firstId) {
-      this.selectedAircraftId = firstId;
-    }
-
-    this.cards = Array.from(document.querySelectorAll('.aircraft-card'));
-    this.bindEvents();
-  }
-
   updateSpecsPanel() {
     const specEngine = document.getElementById('spec-engine');
     const specThrust = document.getElementById('spec-thrust');
@@ -164,41 +129,47 @@ export class MenuManager {
     const config = this.aircraftManager ? this.aircraftManager.configs[this.selectedAircraftId] : null;
     if (!config) return;
 
-    if (config.id === 'trainer') {
-      specEngine.textContent = 'Single Piston';
-      specThrust.textContent = '6.8 kN';
-      specRoll.textContent = '1.5 rad/s';
-    } else if (config.id === 'fighter') {
-      specEngine.textContent = 'Twin Turbofan';
-      specThrust.textContent = '115.0 kN';
-      specRoll.textContent = '3.0 rad/s';
-    } else if (config.id === 'stunt') {
-      specEngine.textContent = 'Radial Piston';
-      specThrust.textContent = '5.2 kN';
-      specRoll.textContent = '4.5 rad/s';
-    } else if (config.id === 'cargo') {
-      specEngine.textContent = 'Quad Turboprop';
-      specThrust.textContent = '180.0 kN';
-      specRoll.textContent = '0.5 rad/s';
-    } else if (config.id === 'f22') {
-      specEngine.textContent = 'Twin Vectoring';
-      specThrust.textContent = '156.0 kN';
-      specRoll.textContent = '3.2 rad/s';
-    } else if (config.id === 'b2') {
-      specEngine.textContent = 'Quad Turbofan';
-      specThrust.textContent = '312.0 kN';
-      specRoll.textContent = '0.45 rad/s';
-    } else if (config.id === 'f16') {
-      specEngine.textContent = 'Single Turbofan';
-      specThrust.textContent = '79.0 kN';
-      specRoll.textContent = '3.2 rad/s';
-    } else if (config.id === 'f35') {
-      specEngine.textContent = 'Single Turbofan';
-      specThrust.textContent = '191.0 kN';
-      specRoll.textContent = '2.8 rad/s';
-    }
+    // Dynamically retrieve parameters directly from the parsed plane profile
+    specEngine.textContent = config.engineType ?? "Single Propeller";
+    
+    // Convert base Newtons into a user-friendly kilonewtons (kN) format
+    const thrustKn = (config.maxThrust / 1000).toFixed(1);
+    specThrust.textContent = `${thrustKn} kN`;
+    
+    specRoll.textContent = `${config.rollRate.toFixed(2)} rad/s`;
   }
 
-  update(deltaTime) {
+  renderAircraftCards() {
+    const container = document.querySelector('.aircraft-cards-container');
+    if (!container) return;
+    container.innerHTML = ''; 
+
+    if (!this.aircraftManager) {
+      this.aircraftManager = this.engine.moduleManager.get('Aircraft');
+    }
+    const configs = this.aircraftManager ? this.aircraftManager.configs : {};
+    
+    Object.keys(configs).forEach((id, index) => {
+      const config = configs[id];
+      const card = document.createElement('div');
+      card.className = `aircraft-card${index === 0 ? ' selected' : ''}`;
+      card.setAttribute('data-id', id);
+      
+      const desc = config.description || `Configured ${config.name} model.`;
+      card.innerHTML = `
+        <div class="card-title">${config.name}</div>
+        <p class="description">${desc}</p>
+      `;
+      container.appendChild(card);
+    });
+
+    const firstId = Object.keys(configs)[0];
+    if (firstId) {
+      this.selectedAircraftId = firstId;
+    }
+    this.cards = Array.from(document.querySelectorAll('.aircraft-card'));
+    this.bindEvents();
   }
+
+  update(deltaTime) {}
 }
