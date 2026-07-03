@@ -12,6 +12,10 @@
   "liftCoefficientMax": 1.85,
   "emptyWeight": 9700,
   "maxFuelCapacity": 8200,
+  "isJet": true,
+  "terminalSpeed": 200.0,
+  "stallSpeed": 28.0,
+  "pitchGScale": 7.5,
   "dimensions": {
     "span": 13.56,
     "length": 18.9,
@@ -24,21 +28,8 @@
     "lookAheadDistance": 8.5
   },
   "modelType": "built-in",
-  "modelPath": "",
-  "modelScale": {
-    "x": 1.0,
-    "y": 1.0,
-    "z": 1.0
-  },
-  "modelRotation": {
-    "x": 0.0,
-    "y": 0.0,
-    "z": 0.0
-  },
-  "modelPosition": {
-    "x": 0.0,
-    "y": 0.0,
-    "z": 0.0
-  },
+  "modelScale": { "x": 1.0, "y": 1.0, "z": 1.0 },
+  "modelRotation": { "x": 0.0, "y": 0.0, "z": 0.0 },
+  "modelPosition": { "x": 0.0, "y": 0.0, "z": 0.0 },
   "groundClearanceOffset": 1.2
 }

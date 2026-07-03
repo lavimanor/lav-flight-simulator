@@ -95,17 +95,24 @@ export class MenuManager {
       this.weatherManager.setWeather(this.selectedWeatherId);
     }
     if (this.aircraftManager && this.aircraftManager.activeAircraft) {
-      const currentPos = this.aircraftManager.activeAircraft.position.clone();
-      const currentVel = this.aircraftManager.activeAircraft.velocity.clone();
-      const currentQuat = this.aircraftManager.activeAircraft.group.quaternion.clone();
-      const currentThrottle = this.aircraftManager.activeAircraft.controls.throttle;
+      const prev = this.aircraftManager.activeAircraft;
+      const currentPos = prev.position.clone();
+      
       this.aircraftManager.spawnAircraft(this.selectedAircraftId, currentPos);
+      
       const newAircraft = this.aircraftManager.activeAircraft;
-      newAircraft.velocity.copy(currentVel);
-      newAircraft.group.quaternion.copy(currentQuat);
-      newAircraft.rotation.copy(newAircraft.group.rotation);
-      newAircraft.quaternion.copy(newAircraft.group.quaternion);
-      newAircraft.controls.throttle = currentThrottle;
+      // Only carry over speed and alignment if the previous aircraft was flying safely
+      if (prev && !prev.isCrashed) {
+        const currentVel = prev.velocity.clone();
+        const currentQuat = prev.group.quaternion.clone();
+        const currentThrottle = prev.controls.throttle;
+        
+        newAircraft.velocity.copy(currentVel);
+        newAircraft.group.quaternion.copy(currentQuat);
+        newAircraft.rotation.copy(newAircraft.group.rotation);
+        newAircraft.quaternion.copy(newAircraft.group.quaternion);
+        newAircraft.controls.throttle = currentThrottle;
+      }
     }
     this.closeMenu();
   }

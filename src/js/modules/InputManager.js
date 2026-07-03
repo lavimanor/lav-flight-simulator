@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 export class InputManager {
   constructor() {
     this.engine = null;
@@ -8,18 +9,22 @@ export class InputManager {
     this.onKeyDown = (e) => this.handleKeyDown(e);
     this.onKeyUp = (e) => this.handleKeyUp(e);
   }
+
   init(engine) {
     this.engine = engine;
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
   }
+
   handleKeyDown(e) {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift', 'Control'].includes(e.key)) {
       e.preventDefault();
     }
     this.keys[e.code] = true;
+
     const mainMenu = this.engine ? this.engine.moduleManager.get('MainMenu') : null;
     const mainMenuOpen = mainMenu ? mainMenu.isOpen : false;
+
     if (!mainMenuOpen && (!this.menuManager || !this.menuManager.isOpen)) {
       const aircraft = this.aircraftManager ? this.aircraftManager.activeAircraft : null;
       if (aircraft) {
@@ -56,9 +61,11 @@ export class InputManager {
       }
     }
   }
+
   handleKeyUp(e) {
     this.keys[e.code] = false;
   }
+
   update(deltaTime) {
     if (!this.engine || !this.engine.moduleManager) return;
     if (!this.aircraftManager) {
@@ -68,15 +75,19 @@ export class InputManager {
       this.menuManager = this.engine.moduleManager.get('Menu');
     }
     if (!this.aircraftManager || !this.aircraftManager.activeAircraft) return;
+
     const aircraft = this.aircraftManager.activeAircraft;
     aircraft.controls.pitch = 0;
     aircraft.controls.roll = 0;
     aircraft.controls.yaw = 0;
+
     const mainMenu = this.engine.moduleManager.get('MainMenu');
     const mainMenuOpen = mainMenu ? mainMenu.isOpen : false;
+
     if (mainMenuOpen || (this.menuManager && this.menuManager.isOpen) || aircraft.isCrashed) {
       return;
     }
+
     if (this.keys['KeyW'] || this.keys['ArrowUp']) {
       aircraft.controls.pitch = -1.0;
     }
@@ -95,16 +106,19 @@ export class InputManager {
     if (this.keys['KeyE']) {
       aircraft.controls.yaw = 1.0;
     }
+
+    const isJet = aircraft.config.isJet ?? ['fighter', 'f16', 'f22', 'f35', 'b2'].includes(aircraft.config.id);
+
     if (aircraft.engineOn && aircraft.engineSpool > 0.8) {
       const throttleRate = 1.5 * deltaTime;
       if (this.keys['ShiftLeft'] || this.keys['Space']) {
-        const maxThrottle = aircraft.config.id === 'fighter' ? 1.2 : 1.0;
+        const maxThrottle = isJet ? 1.2 : 1.0;
         aircraft.controls.throttle = Math.min(aircraft.controls.throttle + throttleRate, maxThrottle);
       }
       if (this.keys['ControlLeft'] || this.keys['KeyX']) {
         aircraft.controls.throttle = Math.max(aircraft.controls.throttle - throttleRate, 0.0);
       }
-      if (aircraft.config.id === 'fighter' && aircraft.controls.throttle > 1.01) {
+      if (isJet && aircraft.controls.throttle > 1.01) {
         aircraft.afterburnerActive = true;
       } else {
         aircraft.afterburnerActive = false;
@@ -114,6 +128,7 @@ export class InputManager {
       aircraft.afterburnerActive = false;
     }
   }
+
   destroy() {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
