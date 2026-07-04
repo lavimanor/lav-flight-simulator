@@ -34,6 +34,16 @@ export class PropulsionSolver {
 
     const baseThrustForce = effectiveThrottle * config.maxThrust * afterburnerThrustMultiplier * aircraft.engineSpool;
 
-    return baseThrustForce * altitudeThrustCoefficient;
+    // Propeller thrust lapse: a fixed-pitch prop makes strong static thrust for
+    // takeoff but loses it as forward speed approaches the design maximum, so the
+    // aircraft settles at a realistic cruise/terminal speed instead of accelerating
+    // without limit. Jet thrust stays essentially flat with speed (drag limits it).
+    let speedLapse = 1.0;
+    if (!isJet) {
+      const propMaxSpeed = (config.terminalSpeed ?? 60.0) * 1.15;
+      speedLapse = THREE.MathUtils.clamp(1.0 - Math.max(aircraft.airspeed, 0) / propMaxSpeed, 0.08, 1.0);
+    }
+
+    return baseThrustForce * altitudeThrustCoefficient * speedLapse;
   }
 }

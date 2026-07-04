@@ -1,19 +1,52 @@
 import * as THREE from 'three';
 import { Noise } from '../utils/Noise.js';
+import { Aerodynamics } from './Aerodynamics.js';
 import { Atmosphere } from './Atmosphere.js';
 import { PropulsionSolver } from './PropulsionSolver.js';
 import { DragSolver } from './DragSolver.js';
 import { BrakeSolver } from './BrakeSolver.js';
 import { LiftSolver } from './LiftSolver.js';
 
+/**
+ * Vector-based flight dynamics.
+ *
+ * Forces (thrust, lift, drag, gravity) are summed as world-space vectors and
+ * integrated with Newton's second law, which gives natural climb/descent,
+ * acceleration to a drag-limited terminal speed, and coordinated turns.
+ *
+ * Rotation is integrated from aerodynamic moments (elevator/aileron/rudder plus
+ * damping and static stability). A dedicated ground model keeps the aircraft on
+ * its wheels, adds rolling/braking friction, and only lets the nose rotate once
+ * the aircraft is fast enough to fly - which prevents the "tap the elevator and
+ * the tail digs in" behaviour.
+ *
+ * Frame conventions (must match the renderer/camera):
+ *   local +Z = forward, +Y = up, +X = right (starboard)
+ *   group.rotateX(+) pitches the nose DOWN, rotateY(+) yaws right, rotateZ(+) rolls left.
+ */
 export class FlightPhysicsSolver {
   static noise = new Noise(12345);
   static elevationScale = 0.00015;
   static maxElevation = 700;
 
+  // Handling tunables. These are aircraft-independent shape factors; per-aircraft
+  // scaling comes from the JSON config (pitchRate, wingArea, mass, ...).
+  static tuning = {
+    pitchControl: 0.055,   // elevator authority
+    rollControl: 0.090,    // aileron authority
+    yawControl: 0.040,     // rudder authority
+    pitchDamp: 1.1,        // pitch rate damping
+    rollDamp: 1.6,         // roll rate damping
+    yawDamp: 1.0,          // yaw rate damping
+    pitchStability: 0.30,  // static longitudinal stability (returns toward trim AoA)
+    yawStability: 1.2,     // weathervane stability (aligns nose with airflow -> turns)
+    aoaTrim: 0.06          // built-in trim angle of attack (~3.5deg) so hands-off flight sustains lift
+  };
+
   static solve(aircraft, deltaTime) {
     const config = aircraft.config;
     const dt = Math.min(deltaTime, 0.05);
+    if (dt <= 0) return;
 
     if (aircraft.isCrashed) {
       aircraft.velocity.set(0, 0, 0);
@@ -25,44 +58,51 @@ export class FlightPhysicsSolver {
     }
 
     const isJet = config.isJet ?? ['fighter', 'f16', 'f22', 'f35', 'b2'].includes(config.id);
-    const propWashVel = (!isJet) ? (aircraft.rpm * 0.009) : 0.0; // Propwash airflow calculation
 
-    const forwardVector = new THREE.Vector3(0, 0, 1).applyQuaternion(aircraft.group.quaternion);
-    const localUpVector = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraft.group.quaternion);
-    const localRightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(aircraft.group.quaternion);
+    // --- Body axes -----------------------------------------------------------
+    const q = aircraft.group.quaternion;
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
 
+    // --- Environment ---------------------------------------------------------
     const settings = aircraft.engine?.moduleManager?.get('Settings');
     const windEnabled = settings ? settings.enableWind : true;
     const weatherManager = aircraft.engine?.moduleManager?.get('Weather');
     const windVector = (weatherManager && windEnabled) ? weatherManager.wind : new THREE.Vector3(0, 0, 0);
+    const gustVector = (weatherManager && windEnabled) ? weatherManager.currentGust : new THREE.Vector3(0, 0, 0);
+    const totalWind = windVector.clone().add(gustVector);
 
     aircraft.altitude = aircraft.position.y;
     const airDensity = Atmosphere.getDensity(aircraft.position.y);
     const speedOfSound = Atmosphere.getSpeedOfSound(aircraft.position.y);
-    const machNumber = aircraft.airspeed / speedOfSound; 
-    const terrainHeight = this.getTerrainHeightAt(aircraft.position.x, aircraft.position.z);
-    
+    const seaLevelDensity = 1.225;
+    const densityRatio = airDensity / seaLevelDensity;
+
     const span = config.dimensions.span;
     const length = config.dimensions.length;
-    const keelHeightOffset = aircraft.gearRetracted ? 0.25 : (config.groundClearanceOffset ?? 1.2);
+    const gearHeight = aircraft.gearRetracted
+      ? (config.bellyClearance ?? 0.35)
+      : (config.groundClearanceOffset ?? 1.2);
     const waterLevel = 135.0;
 
-    // Sinking mechanics
+    const terrainHeight = FlightPhysicsSolver.getTerrainHeightAt(aircraft.position.x, aircraft.position.z);
+    const heightAboveGround = aircraft.position.y - terrainHeight;
+
+    // --- Water impact / sinking ---------------------------------------------
     if (aircraft.isSinking) {
       aircraft.airspeed = THREE.MathUtils.lerp(aircraft.airspeed, 0.0, 5.0 * dt);
       aircraft.indicatedAirspeed = aircraft.airspeed;
-      aircraft.velocity.set(forwardVector.x * aircraft.airspeed, -2.5, forwardVector.z * aircraft.airspeed);
+      aircraft.velocity.set(forward.x * aircraft.airspeed, -2.5, forward.z * aircraft.airspeed);
       aircraft.position.addScaledVector(aircraft.velocity, dt);
-
       if (aircraft.position.y < waterLevel - 6.0) {
         aircraft.position.y = waterLevel - 6.0;
         aircraft.velocity.set(0, 0, 0);
         if (!aircraft.isCrashed) {
           aircraft.isCrashed = true;
-          console.log(`[FlightPhysicsSolver] Splash down complete. Submersion crash triggered.`);
+          console.log('[FlightPhysicsSolver] Splash down complete. Submersion crash triggered.');
         }
       }
-
       aircraft.group.rotateX(0.4 * dt);
       aircraft.rotation.copy(aircraft.group.rotation);
       aircraft.quaternion.copy(aircraft.group.quaternion);
@@ -71,288 +111,228 @@ export class FlightPhysicsSolver {
       aircraft.group.position.copy(aircraft.position);
       return;
     }
-
     if (aircraft.position.y <= waterLevel + 0.1 && !aircraft.isCrashed) {
       aircraft.isSinking = true;
-      console.log(`[FlightPhysicsSolver] WATER IMPACT - SINKING PHASE INITIATED`);
+      console.log('[FlightPhysicsSolver] WATER IMPACT - SINKING PHASE INITIATED');
       return;
     }
 
-    // Geometrical landing contact points evaluated at start-of-frame
-    const contacts = {
-      nose: aircraft.position.clone().addScaledVector(forwardVector, length * 0.45),
-      tail: aircraft.position.clone().addScaledVector(forwardVector, -length * 0.45),
-      leftTip: aircraft.position.clone().addScaledVector(localRightVector, -span * 0.48),
-      rightTip: aircraft.position.clone().addScaledVector(localRightVector, span * 0.48),
-      keel: aircraft.position.clone().addScaledVector(localUpVector, -keelHeightOffset)
-    };
+    // --- Relative airflow, angle of attack, sideslip -------------------------
+    const relVel = aircraft.velocity.clone().sub(totalWind);
+    const V = relVel.length();                       // true airspeed magnitude
+    const forwardSpeed = relVel.dot(forward);
+    const upSpeed = relVel.dot(up);
+    const rightSpeed = relVel.dot(right);
+    const aoaRad = (V > 1.0) ? Math.atan2(-upSpeed, forwardSpeed) : 0.0;
+    const sideslipRad = (V > 1.0) ? Math.atan2(rightSpeed, Math.abs(forwardSpeed)) : 0.0;
 
-    const terrainAtNose = FlightPhysicsSolver.getTerrainHeightAt(contacts.nose.x, contacts.nose.z);
-    const terrainAtTail = FlightPhysicsSolver.getTerrainHeightAt(contacts.tail.x, contacts.tail.z);
-    const terrainAtLeftTip = FlightPhysicsSolver.getTerrainHeightAt(contacts.leftTip.x, contacts.leftTip.z);
-    const terrainAtRightTip = FlightPhysicsSolver.getTerrainHeightAt(contacts.rightTip.x, contacts.rightTip.z);
-    const terrainAtKeel = FlightPhysicsSolver.getTerrainHeightAt(aircraft.position.x, aircraft.position.z);
+    // Airspeed reported to the HUD/sound is the forward component (indicated).
+    aircraft.airspeed = forwardSpeed;
+    aircraft.indicatedAirspeed = Math.max(forwardSpeed, 0) * Math.sqrt(densityRatio);
+    const machNumber = V / speedOfSound;
 
-    const keelTouch = contacts.keel.y <= terrainAtKeel + 0.05;
-    const onGround = keelTouch;
+    const currentMass = (config.emptyWeight ?? 800) + aircraft.fuel;
+    const weightN = currentMass * 9.81;
 
+    // Ground effect: within one wingspan of the surface, lift improves.
     let geLiftMultiplier = 1.0;
-    const relativeHeight = aircraft.position.y - terrainHeight;
-    if (relativeHeight < span) {
-      const geFactor = (span - Math.max(relativeHeight, 0)) / span;
-      geLiftMultiplier = 1.0 + 0.25 * geFactor;
+    if (heightAboveGround < span && heightAboveGround >= 0) {
+      geLiftMultiplier = 1.0 + 0.20 * (span - heightAboveGround) / span;
     }
 
-    let flapsLiftBonus = 1.0;
-    if (aircraft.flapsStage === 1) {
-      flapsLiftBonus = 1.25;
-    } else if (aircraft.flapsStage === 2) {
-      flapsLiftBonus = 1.50;
+    // Effective max lift coefficient (with flaps) sets the real stall/rotate speeds.
+    const flapsCLBonus = (aircraft.flapsStage === 1) ? 0.28 : (aircraft.flapsStage === 2 ? 0.55 : 0.0);
+    const effectiveCLmax = config.liftCoefficientMax + flapsCLBonus;
+    const stallSpeed = Math.sqrt((2 * weightN) / (Math.max(airDensity, 0.2) * config.wingArea * effectiveCLmax));
+    const rotateSpeed = 0.90 * stallSpeed; // begin raising the nose just below stall speed
+
+    // --- Aerodynamic + propulsive forces ------------------------------------
+    const thrustMag = PropulsionSolver.solve(aircraft, airDensity, dt);
+    const { liftMagnitude } = LiftSolver.solve(aircraft, airDensity, geLiftMultiplier, aoaRad, V);
+    const dragMag = DragSolver.solve(aircraft, airDensity, aoaRad, speedOfSound, heightAboveGround, dt, V);
+
+    const netForce = new THREE.Vector3();
+    netForce.addScaledVector(forward, thrustMag);         // thrust along the nose
+    netForce.y -= weightN;                                // gravity
+
+    if (V > 0.5) {
+      const airflowDir = relVel.clone().multiplyScalar(1 / V);
+      // Drag opposes the direction of travel through the air.
+      netForce.addScaledVector(airflowDir, -dragMag);
+      // Lift is perpendicular to the relative airflow, on the wing's "up" side.
+      let side = up.clone().cross(airflowDir);
+      if (side.lengthSq() < 1e-6) side = right.clone();
+      side.normalize();
+      const liftDir = airflowDir.clone().cross(side).normalize();
+      if (liftDir.dot(up) < 0) liftDir.negate();
+      netForce.addScaledVector(liftDir, liftMagnitude);
     }
 
-    const currentMass = (config.emptyWeight || 800) + aircraft.fuel;
+    const accel = netForce.multiplyScalar(1 / currentMass);
+    // Safety clamp so a pathological frame can never launch the aircraft.
+    const accelMax = 120.0;
+    if (accel.lengthSq() > accelMax * accelMax) accel.setLength(accelMax);
 
-    // Atmospheric wind calculations
-    const gustVector = (weatherManager && windEnabled) ? weatherManager.currentGust : new THREE.Vector3(0, 0, 0);
-    const totalWind = (weatherManager && windEnabled) ? windVector.clone().add(gustVector) : new THREE.Vector3(0, 0, 0);
-    const relativeVelocity = aircraft.velocity.clone().sub(totalWind);
-    const vForward = relativeVelocity.dot(forwardVector);
-    const vUp = relativeVelocity.dot(localUpVector);
-    const aoaRad = (Math.abs(vForward) > 0.1) ? Math.atan2(-vUp, vForward) : 0.0;
+    aircraft.velocity.addScaledVector(accel, dt);
 
-    aircraft.airspeed = relativeVelocity.dot(forwardVector);
+    // --- Integrate position, then resolve ground contact ---------------------
+    aircraft.position.addScaledVector(aircraft.velocity, dt);
 
-    const thrustForceMagnitude = PropulsionSolver.solve(aircraft, airDensity, dt);
-    const dragForceMagnitude = DragSolver.solve(aircraft, airDensity, aoaRad, speedOfSound, relativeHeight, dt);
-    const { liftForceVector, sinkAcceleration } = LiftSolver.solve(aircraft, airDensity, geLiftMultiplier, flapsLiftBonus, aoaRad, dt);
+    const terrainNow = FlightPhysicsSolver.getTerrainHeightAt(aircraft.position.x, aircraft.position.z);
+    const restY = terrainNow + gearHeight;
+    const wasAirborne = heightAboveGround > (gearHeight + 0.25);
+    const onGround = aircraft.position.y <= restY + 0.05;
 
-    const weightForceN = currentMass * 9.81;
-
-    // Longitudinal acceleration integration
-    const gravityAcceleration = -9.81 * forwardVector.y;
-    const forwardAcceleration = ((thrustForceMagnitude - dragForceMagnitude) / currentMass) + gravityAcceleration;
-    aircraft.airspeed += forwardAcceleration * dt;
-
+    let touchdownSink = 0.0;
     if (onGround) {
-      const brakingDeceleration = BrakeSolver.solve(aircraft, onGround, dt);
-      aircraft.airspeed = Math.max(aircraft.airspeed - brakingDeceleration * dt, 0.0);
+      touchdownSink = Math.max(-aircraft.velocity.y, 0.0);
+
+      // Weight-on-wheels: the runway supports the aircraft (no sinking through it).
+      if (aircraft.position.y < restY) aircraft.position.y = restY;
+      if (aircraft.velocity.y < 0) aircraft.velocity.y = 0;
+
+      // Rolling / braking / belly friction opposes horizontal motion.
+      const horizSpeed = Math.hypot(aircraft.velocity.x, aircraft.velocity.z);
+      if (horizSpeed > 1e-4) {
+        const decel = BrakeSolver.solve(aircraft, true, dt);
+        const scale = Math.max(horizSpeed - decel * dt, 0.0) / horizSpeed;
+        aircraft.velocity.x *= scale;
+        aircraft.velocity.z *= scale;
+      }
+      aircraft.isBellyScraping = aircraft.gearRetracted;
     } else {
       aircraft.isBellyScraping = false;
     }
 
-    const terminalSpeed = config.terminalSpeed ?? (isJet ? 140.0 : 50.0);
-    aircraft.airspeed = Math.max(Math.min(aircraft.airspeed, terminalSpeed), 0.0);
+    // Soft cap on total speed as a stability guard (drag already limits it).
+    const terminalSpeed = config.terminalSpeed ?? (isJet ? 180.0 : 60.0);
+    const speedCap = terminalSpeed * 1.3;
+    if (aircraft.velocity.lengthSq() > speedCap * speedCap) aircraft.velocity.setLength(speedCap);
 
-    const seaLevelDensity = 1.225;
-    aircraft.indicatedAirspeed = aircraft.airspeed * Math.sqrt(airDensity / seaLevelDensity);
+    aircraft.group.position.copy(aircraft.position);
+    aircraft.groundSpeed = Math.hypot(aircraft.velocity.x, aircraft.velocity.z);
+    aircraft.verticalSpeed = aircraft.velocity.y;
+    aircraft.sinkRate = Math.max(-aircraft.velocity.y, 0.0);
 
-    // Vertical state integration
-    aircraft.sinkRate = aircraft.sinkRate || 0.0;
-    if (!onGround) {
-      aircraft.sinkRate = THREE.MathUtils.lerp(aircraft.sinkRate, sinkAcceleration * 2.0, 4.0 * dt);
-    } else {
-      aircraft.sinkRate = 0.0; // Strictly clamping sink rate value to 0 on runway to prevent spawn crash
-    }
+    // --- Collision / crash geometry -----------------------------------------
+    const pitchDeg = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1)) * (180 / Math.PI);
+    const bankDeg = Math.abs(aircraft.rotation.z) * (180 / Math.PI);
 
-    const bankAngleRad = aircraft.rotation.z;
-    const slipDriftSpeed = -Math.sin(bankAngleRad) * Math.min(aircraft.airspeed / 20.0, 1.0) * 4.0;
+    const nose = aircraft.position.clone().addScaledVector(forward, length * 0.45);
+    const tail = aircraft.position.clone().addScaledVector(forward, -length * 0.45);
+    const leftTip = aircraft.position.clone().addScaledVector(right, -span * 0.48);
+    const rightTip = aircraft.position.clone().addScaledVector(right, span * 0.48);
 
-    const targetRelativeVelocity = forwardVector.clone().multiplyScalar(aircraft.airspeed);
-    targetRelativeVelocity.addScaledVector(localRightVector, slipDriftSpeed);
-    targetRelativeVelocity.y -= aircraft.sinkRate;
-
-    const targetVelocityVector = targetRelativeVelocity.clone().add(totalWind);
-    aircraft.velocity.copy(targetVelocityVector);
-
-    // Lift vs Gravity balance checks on the ground
-    const netVerticalAcceleration = (liftForceVector.y - weightForceN) / currentMass;
-    if (onGround) {
-      if (netVerticalAcceleration > 0.02) {
-        aircraft.velocity.y += netVerticalAcceleration * dt;
-        aircraft.velocity.y = Math.max(aircraft.velocity.y, 0.0);
-      } else {
-        aircraft.velocity.y = 0.0;
-        aircraft.sinkRate = 0.0;
-      }
-    } else {
-      aircraft.velocity.y += netVerticalAcceleration * dt;
-    }
-
-    aircraft.position.addScaledVector(aircraft.velocity, dt);
-    aircraft.groundSpeed = Math.sqrt(aircraft.velocity.x * aircraft.velocity.x + aircraft.velocity.z * aircraft.velocity.z);
-
-    // POST-INTEGRATION GEOMETRICAL CHECKS
-    const contactsPost = {
-      nose: aircraft.position.clone().addScaledVector(forwardVector, length * 0.45),
-      tail: aircraft.position.clone().addScaledVector(forwardVector, -length * 0.45),
-      leftTip: aircraft.position.clone().addScaledVector(localRightVector, -span * 0.48),
-      rightTip: aircraft.position.clone().addScaledVector(localRightVector, span * 0.48),
-      keel: aircraft.position.clone().addScaledVector(localUpVector, -keelHeightOffset)
-    };
-
-    const terrainAtNosePost = FlightPhysicsSolver.getTerrainHeightAt(contactsPost.nose.x, contactsPost.nose.z);
-    const terrainAtTailPost = FlightPhysicsSolver.getTerrainHeightAt(contactsPost.tail.x, contactsPost.tail.z);
-    const terrainAtLeftTipPost = FlightPhysicsSolver.getTerrainHeightAt(contactsPost.leftTip.x, contactsPost.leftTip.z);
-    const terrainAtRightTipPost = FlightPhysicsSolver.getTerrainHeightAt(contactsPost.rightTip.x, contactsPost.rightTip.z);
-    const terrainAtKeelPost = FlightPhysicsSolver.getTerrainHeightAt(aircraft.position.x, aircraft.position.z);
-
-    // Forgiving collision limits
-    const noseStrikePost = contactsPost.nose.y <= terrainAtNosePost && aircraft.velocity.y < -3.0;
-    const tailStrikePost = contactsPost.tail.y <= terrainAtTailPost && aircraft.velocity.y < -3.0;
-    const leftTipStrikePost = contactsPost.leftTip.y <= terrainAtLeftTipPost && Math.abs(aircraft.angularVelocity.z) > 1.2;
-    const rightTipStrikePost = contactsPost.rightTip.y <= terrainAtRightTipPost && Math.abs(aircraft.angularVelocity.z) > 1.2;
-    const keelTouchPost = contactsPost.keel.y <= terrainAtKeelPost + 0.05;
+    const noseDug = nose.y < FlightPhysicsSolver.getTerrainHeightAt(nose.x, nose.z);
+    const tailDug = tail.y < FlightPhysicsSolver.getTerrainHeightAt(tail.x, tail.z);
+    const leftDug = leftTip.y < FlightPhysicsSolver.getTerrainHeightAt(leftTip.x, leftTip.z);
+    const rightDug = rightTip.y < FlightPhysicsSolver.getTerrainHeightAt(rightTip.x, rightTip.z);
 
     const obstacleManager = aircraft.engine?.moduleManager?.get('Obstacles');
     const hitObstacle = obstacleManager ? obstacleManager.checkCollision(aircraft) : false;
 
-    if (noseStrikePost || tailStrikePost || leftTipStrikePost || rightTipStrikePost || keelTouchPost || hitObstacle) {
-      const preClampSinkingSpeed = aircraft.velocity.y;
-      const pitchAngleRadLocal = Math.asin(THREE.MathUtils.clamp(forwardVector.y, -1.0, 1.0));
-      const pitchAngleDeg = pitchAngleRadLocal * (180 / Math.PI);
+    // Crash conditions (forgiving: normal runway ops and gentle touchdowns are safe).
+    const hardTouchdown = wasAirborne && onGround && touchdownSink > (aircraft.gearRetracted ? 4.5 : 9.0);
+    const noseStrike = noseDug && (pitchDeg < -18.0 || touchdownSink > 6.0);
+    const tailStrike = tailDug && (pitchDeg > 16.0 || touchdownSink > 6.0);
+    const wingStrike = (leftDug || rightDug) && bankDeg > 22.0 && aircraft.groundSpeed > 8.0;
 
-      const noseDiveImpact = noseStrikePost || (pitchAngleDeg < -15.0 && keelTouchPost && aircraft.velocity.y < -4.0);
-      const tailDiveImpact = tailStrikePost || (pitchAngleDeg > 20.0 && keelTouchPost && aircraft.velocity.y < -4.0);
-      const wingStrike = leftTipStrikePost || rightTipStrikePost;
-      const severeHardSlam = preClampSinkingSpeed < -9.5 && !onGround;
-      const highSpeedBellyScrape = aircraft.gearRetracted && aircraft.airspeed > 12.0;
-
-      if (noseDiveImpact || tailDiveImpact || wingStrike || severeHardSlam || highSpeedBellyScrape || hitObstacle) {
-        aircraft.isCrashed = true;
-        aircraft.velocity.set(0, 0, 0);
-        aircraft.angularVelocity.set(0, 0, 0);
-        aircraft.airspeed = 0;
-        aircraft.indicatedAirspeed = 0;
-        aircraft.groundSpeed = 0;
-        console.log(`[FlightPhysicsSolver] CRASH DETECTED! NoseImpact: ${noseDiveImpact}, TailImpact: ${tailDiveImpact}, WingStrike: ${wingStrike}, HardSlam: ${severeHardSlam}, BellyScrape: ${highSpeedBellyScrape}, Obstacle: ${hitObstacle}`);
-        return;
-      }
-
-      if (keelTouchPost) {
-        aircraft.position.y = terrainAtKeelPost + keelHeightOffset;
-        aircraft.velocity.y = 0.0;
-        aircraft.sinkRate = 0.0;
-
-        aircraft.rotation.z = THREE.MathUtils.lerp(aircraft.rotation.z, 0, 10.0 * dt);
-        
-        const rotatingActive = Math.abs(aircraft.controls.pitch) > 0.1;
-        if (!rotatingActive || aircraft.airspeed < 5.0) {
-          aircraft.rotation.x = THREE.MathUtils.lerp(aircraft.rotation.x, 0, 8.0 * dt);
-        } else {
-          // Allow rotation nose-up (negative Euler X) up to -0.32 rad (~18 degrees)
-          // Clamp nose-down pitch to 0.02 rad to prevent nose clipping
-          aircraft.rotation.x = THREE.MathUtils.clamp(aircraft.rotation.x, -0.32, 0.02);
-        }
-
-        // CRITICAL SYNC FIX: Recalculates visual quaternions AND updates physical flight orientation systems
-        aircraft.group.rotation.copy(aircraft.rotation);
-        aircraft.group.quaternion.setFromEuler(aircraft.group.rotation);
-        aircraft.quaternion.copy(aircraft.group.quaternion);
-
-        if (aircraft.gearRetracted) {
-          aircraft.isBellyScraping = true;
-        }
-      }
-    } else {
-      aircraft.isBellyScraping = false;
+    if (hardTouchdown || noseStrike || tailStrike || wingStrike || hitObstacle) {
+      aircraft.isCrashed = true;
+      aircraft.velocity.set(0, 0, 0);
+      aircraft.angularVelocity.set(0, 0, 0);
+      aircraft.airspeed = 0;
+      aircraft.indicatedAirspeed = 0;
+      aircraft.groundSpeed = 0;
+      console.log(`[FlightPhysicsSolver] CRASH. hardTouchdown:${hardTouchdown} nose:${noseStrike} tail:${tailStrike} wing:${wingStrike} obstacle:${hitObstacle} sink:${touchdownSink.toFixed(1)}`);
+      return;
     }
 
-    aircraft.group.position.copy(aircraft.position);
-
-    // Stall checks
-    const stallSpeed = config.stallSpeed ?? (isJet ? 28.0 : 14.0);
-    aircraft.isStalled = (aircraft.indicatedAirspeed < stallSpeed) && (aircraft.position.y > terrainHeight + 2.0);
+    // --- Stall / spin state --------------------------------------------------
+    const airborne = heightAboveGround > 2.0;
+    aircraft.isStalled = airborne && Math.abs(aoaRad) > Aerodynamics.criticalAoA;
+    const stallFactor = aircraft.isStalled ? 0.35 : 1.0;
 
     if (aircraft.isStalled) {
-      const stallNoseDropMoment = 0.8 * dt;
-      aircraft.angularVelocity.x += stallNoseDropMoment;
-      aircraft.angularVelocity.x += (Math.random() - 0.5) * 0.15;
-      aircraft.angularVelocity.z += (Math.random() - 0.5) * 0.15;
-
+      // A stalled wing drops its nose; asymmetry can develop into a spin.
+      aircraft.angularVelocity.x += 0.6 * dt;
+      aircraft.angularVelocity.x += (Math.random() - 0.5) * 0.10;
+      aircraft.angularVelocity.z += (Math.random() - 0.5) * 0.10;
       if (!aircraft.isSpinning && (Math.abs(aircraft.controls.roll) > 0.5 || Math.abs(aircraft.controls.yaw) > 0.5)) {
         aircraft.isSpinning = true;
-        aircraft.spinDir = Math.sign(aircraft.controls.roll || aircraft.controls.yaw);
+        aircraft.spinDir = Math.sign(aircraft.controls.roll || aircraft.controls.yaw) || 1;
       }
     } else {
       aircraft.isSpinning = false;
     }
 
-    const effectiveControlSpeed = Math.max(aircraft.airspeed, propWashVel, 12.0);
-
-    // Moments of inertia estimations
-    const Ixx = (1 / 12) * currentMass * span * span;
-    const Iyy = (1 / 12) * currentMass * length * length;
-    const Izz = (1 / 12) * currentMass * (span * span + length * length);
-
+    // --- Rotational dynamics -------------------------------------------------
     aircraft.controls.pitchSmoothed = THREE.MathUtils.lerp(aircraft.controls.pitchSmoothed || 0, aircraft.controls.pitch, 8.0 * dt);
     aircraft.controls.rollSmoothed = THREE.MathUtils.lerp(aircraft.controls.rollSmoothed || 0, aircraft.controls.roll, 8.0 * dt);
     aircraft.controls.yawSmoothed = THREE.MathUtils.lerp(aircraft.controls.yawSmoothed || 0, aircraft.controls.yaw, 8.0 * dt);
 
-    const pitchInput = -aircraft.controls.pitchSmoothed;
-    const rollInput = aircraft.controls.rollSmoothed;
-    const yawInput = -aircraft.controls.yawSmoothed;
+    const pitchCmd = aircraft.controls.pitchSmoothed; // +1 (S) = nose up
+    const rollCmd = aircraft.controls.rollSmoothed;   // +1 (D) = bank right
+    const yawCmd = aircraft.controls.yawSmoothed;      // +1 (E) = nose right
 
-    const controlQ = 0.5 * airDensity * effectiveControlSpeed * effectiveControlSpeed;
-    const stallFactor = aircraft.isStalled ? 0.15 : 1.0;
+    // Control effectiveness scales with dynamic pressure; a small floor keeps the
+    // aircraft recoverable at very low airborne speed.
+    const controlSpeed = Math.max(V, 12.0);
+    const controlQ = 0.5 * airDensity * controlSpeed * controlSpeed;
+    const qSc = controlQ * config.wingArea;
 
-    // Standardized Moment Coefficients (Cm, Cl, Cn)
-    const pitchCoef = 0.045; 
-    const rollCoef = 0.055;  
-    const yawCoef = 0.025;   
+    const T = FlightPhysicsSolver.tuning;
 
-    const pitchControlTorque = pitchInput * config.pitchRate * pitchCoef * controlQ * config.wingArea * length;
-    const rollControlTorque = rollInput * config.rollRate * rollCoef * controlQ * config.wingArea * span;
-    const yawControlTorque = yawInput * config.yawRate * yawCoef * controlQ * config.wingArea * length;
+    // Inertia estimates (thin-body approximations).
+    const Ixx = (1 / 12) * currentMass * span * span;                 // roll
+    const Iyy = (1 / 12) * currentMass * length * length;             // pitch
+    const Izz = (1 / 12) * currentMass * (span * span + length * length); // yaw
 
-    // Density-scaled damping loops
-    const densityRatio = airDensity / 1.225;
-    const pitchDamping = -aircraft.angularVelocity.x * 0.8 * (effectiveControlSpeed / 20.0) * densityRatio * Iyy;
-    const rollDamping = -aircraft.angularVelocity.z * 1.2 * (effectiveControlSpeed / 20.0) * densityRatio * Ixx;
-    const yawDamping = -aircraft.angularVelocity.y * 0.8 * (effectiveControlSpeed / 20.0) * densityRatio * Izz;
+    // Body-axis torques. +X = nose down, +Y = nose right, +Z = roll left.
+    const dampScale = (controlSpeed / 20.0) * densityRatio;
 
-    const pitchStability = -aoaRad * 1.5 * controlQ * config.wingArea * length;
-    const sideslipAngle = -Math.atan2(relativeVelocity.dot(localRightVector), Math.max(aircraft.airspeed, 1.0));
-    const yawStability = sideslipAngle * 1.5 * controlQ * config.wingArea * length;
+    let tauX = -pitchCmd * config.pitchRate * T.pitchControl * qSc * length * stallFactor; // elevator (nose up = -X)
+    tauX += T.pitchStability * (aoaRad - T.aoaTrim) * qSc * length * stallFactor;           // static stability toward trim AoA
+    tauX += -aircraft.angularVelocity.x * T.pitchDamp * dampScale * Iyy;                    // pitch damping
 
-    const hasThrustVectoring = config.id === 'f22';
-    const vectoringPitchTorque = -aircraft.controls.pitchSmoothed * (thrustForceMagnitude * 0.5);
-    const vectoringYawTorque = -aircraft.controls.yawSmoothed * (thrustForceMagnitude * 0.2);
+    let tauZ = -rollCmd * config.rollRate * T.rollControl * qSc * span * stallFactor;       // aileron (bank right = -Z)
+    tauZ += -aircraft.angularVelocity.z * T.rollDamp * dampScale * Ixx;                     // roll damping
 
-    let machTuckMoment = 0.0;
-    if (isJet && machNumber > 0.90 && machNumber < 1.25) {
-      const tuckFactor = Math.sin((machNumber - 0.90) * Math.PI / 0.35);
-      machTuckMoment = 0.32 * tuckFactor * dt * Iyy;
+    let tauY = yawCmd * config.yawRate * T.yawControl * qSc * length * stallFactor;         // rudder (nose right = +Y)
+    tauY += T.yawStability * sideslipRad * qSc * length * stallFactor;                      // weathervane -> coordinates turns
+    tauY += -aircraft.angularVelocity.y * T.yawDamp * dampScale * Izz;                      // yaw damping
+
+    // Optional per-type effects.
+    if (config.id === 'f22') { // thrust vectoring stays effective at low speed
+      tauX += -pitchCmd * thrustMag * 0.4;
+      tauY += yawCmd * thrustMag * 0.15;
+    }
+    if (isJet && machNumber > 0.90 && machNumber < 1.25) { // transonic "mach tuck"
+      tauX += 0.30 * Math.sin((machNumber - 0.90) * Math.PI / 0.35) * Iyy;
     }
 
-    const totalPitchTorque = pitchControlTorque * stallFactor + pitchDamping + pitchStability * stallFactor + (hasThrustVectoring ? vectoringPitchTorque : 0.0) + machTuckMoment;
-    const totalRollTorque = rollControlTorque * stallFactor + rollDamping;
-    const totalYawTorque = yawControlTorque * stallFactor + yawDamping + yawStability * stallFactor + (hasThrustVectoring ? vectoringYawTorque : 0.0);
-
-    const pitchAccel = totalPitchTorque / Iyy;
-    const rollAccel = totalRollTorque / Ixx;
-    const yawAccel = totalYawTorque / Izz;
+    const pitchAccel = tauX / Iyy;
+    const rollAccel = tauZ / Ixx;
+    const yawAccel = tauY / Izz;
 
     if (aircraft.isSpinning) {
-      aircraft.angularVelocity.z = aircraft.spinDir * 3.5;
-      aircraft.angularVelocity.y = aircraft.spinDir * 1.5;
+      aircraft.angularVelocity.z = aircraft.spinDir * 3.0;
+      aircraft.angularVelocity.y = aircraft.spinDir * 1.2;
       aircraft.angularVelocity.x = 0.5;
-      if (aircraft.controls.pitch < -0.5 && aircraft.indicatedAirspeed > stallSpeed) {
+      if (aircraft.controls.pitch < -0.5 && Math.abs(aoaRad) < Aerodynamics.criticalAoA) {
         aircraft.isSpinning = false;
         aircraft.isStalled = false;
       }
     } else if (onGround) {
-      aircraft.angularVelocity.z = 0; // Lock roll on ground
-      
-      // Pitch rotation is unlocked once forward speed or propeller wash exceeds 12m/s
-      const canRotate = (aircraft.airspeed > 12.0 || propWashVel > 12.0);
-      if (canRotate) {
-        aircraft.angularVelocity.x += pitchAccel * dt;
-      } else {
-        aircraft.angularVelocity.x = 0;
-      }
-
-      if (aircraft.airspeed > 1.0) {
-        aircraft.angularVelocity.y = -aircraft.controls.yawSmoothed * config.yawRate * (aircraft.airspeed / 15.0);
+      // Wings held level on the wheels.
+      aircraft.angularVelocity.z = 0;
+      // The nose only comes up once we are fast enough to fly.
+      aircraft.angularVelocity.x = (forwardSpeed > rotateSpeed)
+        ? aircraft.angularVelocity.x + pitchAccel * dt
+        : THREE.MathUtils.lerp(aircraft.angularVelocity.x, 0, 10.0 * dt);
+      // Nosewheel/rudder steering, scaled by speed.
+      if (Math.abs(forwardSpeed) > 0.5) {
+        aircraft.angularVelocity.y = yawCmd * config.yawRate * THREE.MathUtils.clamp(forwardSpeed / 25.0, 0, 1) * 0.8;
       } else {
         aircraft.angularVelocity.y = 0;
       }
@@ -362,50 +342,52 @@ export class FlightPhysicsSolver {
       aircraft.angularVelocity.z += rollAccel * dt;
     }
 
-    aircraft.angularVelocity.x = THREE.MathUtils.clamp(aircraft.angularVelocity.x, -4.0, 4.0);
+    aircraft.angularVelocity.x = THREE.MathUtils.clamp(aircraft.angularVelocity.x, -3.0, 3.0);
     aircraft.angularVelocity.y = THREE.MathUtils.clamp(aircraft.angularVelocity.y, -2.0, 2.0);
-    aircraft.angularVelocity.z = THREE.MathUtils.clamp(aircraft.angularVelocity.z, -5.0, 5.0);
+    aircraft.angularVelocity.z = THREE.MathUtils.clamp(aircraft.angularVelocity.z, -4.0, 4.0);
 
-    if (weatherManager && weatherManager.turbulenceIntensity > 0) {
+    if (weatherManager && weatherManager.turbulenceIntensity > 0 && windEnabled) {
       const tIntensity = weatherManager.turbulenceIntensity;
       const time = performance.now() * 0.012;
-      const tPitchGust = Math.sin(time * 3.7) * 0.08 * tIntensity;
-      const tRollGust = Math.cos(time * 4.9) * 0.15 * tIntensity;
-      const tYawGust = Math.sin(time * 2.3) * 0.04 * tIntensity;
-      aircraft.angularVelocity.x += tPitchGust;
-      aircraft.angularVelocity.z += tRollGust;
-      aircraft.angularVelocity.y += tYawGust;
+      aircraft.angularVelocity.x += Math.sin(time * 3.7) * 0.06 * tIntensity;
+      aircraft.angularVelocity.z += Math.cos(time * 4.9) * 0.12 * tIntensity;
+      aircraft.angularVelocity.y += Math.sin(time * 2.3) * 0.03 * tIntensity;
     }
 
     aircraft.group.rotateX(aircraft.angularVelocity.x * dt);
-    aircraft.group.rotateZ(aircraft.angularVelocity.z * dt);
     aircraft.group.rotateY(aircraft.angularVelocity.y * dt);
-
+    aircraft.group.rotateZ(aircraft.angularVelocity.z * dt);
     aircraft.rotation.copy(aircraft.group.rotation);
+
+    // On the ground, keep the attitude sane: wings level, and the nose between a
+    // slight nose-down and a safe nose-up limit so the tail can never dig in.
+    if (onGround && !aircraft.isSpinning) {
+      // Aircraft rotate about the main gear (aft of the CG), so the usable nose-up
+      // angle is larger than the raw CG-to-tail geometry implies. Floor it so heavy,
+      // long-fuselage types can still rotate to fly, and cap it so the tail is safe.
+      const tailStrikeAngle = Math.asin(THREE.MathUtils.clamp(gearHeight / (length * 0.45), 0, 0.9));
+      const maxNoseUp = THREE.MathUtils.clamp(tailStrikeAngle * 0.80, 0.14, 0.26); // ~8deg..15deg
+      aircraft.rotation.z = THREE.MathUtils.lerp(aircraft.rotation.z, 0, 10.0 * dt);
+      aircraft.rotation.x = THREE.MathUtils.clamp(aircraft.rotation.x, -maxNoseUp, 0.03);
+      aircraft.group.rotation.copy(aircraft.rotation);
+      aircraft.group.quaternion.setFromEuler(aircraft.group.rotation);
+    }
     aircraft.quaternion.copy(aircraft.group.quaternion);
 
-    const gravityContribution = localUpVector.y;
-    const pitchGScale = config.pitchGScale ?? (isJet ? 6.5 : 2.5);
-    const pitchG = aircraft.controls.pitchSmoothed * pitchGScale * Math.min(aircraft.airspeed / 25.0, 1.5);
-    const turnG = Math.sin(Math.abs(aircraft.rotation.z)) * 2.0 * Math.min(aircraft.airspeed / 25.0, 1.5);
-    const calculatedG = gravityContribution + pitchG + turnG;
-    aircraft.gForce = THREE.MathUtils.lerp(aircraft.gForce || 1.0, calculatedG, 6.0 * dt);
+    // --- G-force, physiological effects, instruments -------------------------
+    const targetG = onGround ? 1.0 : (weightN > 0 ? liftMagnitude / weightN : 1.0);
+    aircraft.gForce = THREE.MathUtils.lerp(aircraft.gForce || 1.0, THREE.MathUtils.clamp(targetG, -4.0, 12.0), 6.0 * dt);
 
     if (aircraft.gForce > 3.8) {
-      const deltaFactor = (aircraft.gForce - 3.8) / 3.7;
-      aircraft.blackout = Math.min(aircraft.blackout + deltaFactor * dt * 0.4, 1.0);
+      aircraft.blackout = Math.min(aircraft.blackout + ((aircraft.gForce - 3.8) / 3.7) * dt * 0.4, 1.0);
     } else {
       aircraft.blackout = Math.max(aircraft.blackout - dt * 0.8, 0.0);
     }
-
     if (aircraft.gForce < 0.1) {
-      const deltaFactor = Math.abs(0.1 - aircraft.gForce) / 2.1;
-      aircraft.redout = Math.min(aircraft.redout + deltaFactor * dt * 0.4, 1.0);
+      aircraft.redout = Math.min(aircraft.redout + (Math.abs(0.1 - aircraft.gForce) / 2.1) * dt * 0.4, 1.0);
     } else {
       aircraft.redout = Math.max(aircraft.redout - dt * 0.8, 0.0);
     }
-
-    aircraft.verticalSpeed = aircraft.velocity.y;
 
     if (isJet) {
       aircraft.rpm = Math.round(aircraft.engineSpool * (4000 + aircraft.controls.throttle * 10000));
@@ -413,7 +395,7 @@ export class FlightPhysicsSolver {
       aircraft.rpm = Math.round(aircraft.engineSpool * (600 + aircraft.controls.throttle * 1800));
     }
 
-    const yawAngle = Math.atan2(forwardVector.x, forwardVector.z);
+    const yawAngle = Math.atan2(forward.x, forward.z);
     let degHeading = Math.round(yawAngle * (180 / Math.PI));
     if (degHeading < 0) degHeading += 360;
     aircraft.heading = degHeading;

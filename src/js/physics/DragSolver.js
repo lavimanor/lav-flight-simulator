@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Aerodynamics } from './Aerodynamics.js';
 
 export class DragSolver {
-  static solve(aircraft, airDensity, aoaRad, speedOfSound, relativeHeight, dt) {
+  static solve(aircraft, airDensity, aoaRad, speedOfSound, relativeHeight, dt, speed) {
     const config = aircraft.config;
     const isJet = config.isJet ?? ['fighter', 'f16', 'f22', 'f35', 'b2'].includes(config.id);
 
@@ -38,7 +38,7 @@ export class DragSolver {
 
     // Transonic wave drag model
     let waveDragCD = 0.0;
-    const machNumber = aircraft.airspeed / speedOfSound;
+    const machNumber = speed / speedOfSound;
     if (isJet && machNumber > 0.82) {
       const transonicPeak = Math.exp(-Math.pow(machNumber - 1.05, 2) / 0.02);
       waveDragCD = 0.075 * transonicPeak; // Supersonic drag barrier profile
@@ -46,8 +46,8 @@ export class DragSolver {
 
     const compositeCD = (baseCD + waveDragCD) * flapsDragMultiplier * gearDragMultiplier * airbrakeCDMultiplier;
     
-    // Dynamic drag force equation: D = 0.5 * rho * V^2 * S * Cd
-    const dynamicPressure = 0.5 * airDensity * aircraft.airspeed * aircraft.airspeed;
+    // Dynamic drag force equation: D = 0.5 * rho * V^2 * S * Cd (true airspeed)
+    const dynamicPressure = 0.5 * airDensity * speed * speed;
 
     return dynamicPressure * config.wingArea * compositeCD;
   }
