@@ -24,10 +24,9 @@ export class MenuManager {
     this.spawnBtn = document.getElementById('menu-spawn-btn');
     this.closeBtn = document.getElementById('menu-close-btn');
 
-    this.renderAircraftCards();
-    this.cards = Array.from(document.querySelectorAll('.aircraft-card'));
     this.weatherBtns = Array.from(document.querySelectorAll('.weather-btn'));
     this.bindEvents();
+    this.renderAircraftCards();
 
     if (this.preview) {
       this.preview.init();
@@ -36,6 +35,8 @@ export class MenuManager {
     this.updateSpecsPanel();
   }
 
+  // Static buttons are bound exactly once from init(); re-binding them on every
+  // card re-render stacked duplicate handlers (e.g. double aircraft spawns).
   bindEvents() {
     if (this.toggleBtn) {
       this.toggleBtn.addEventListener('click', () => this.openMenu());
@@ -47,6 +48,16 @@ export class MenuManager {
       this.spawnBtn.addEventListener('click', () => this.handleSpawnAircraft());
     }
 
+    this.weatherBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.weatherBtns.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        this.selectedWeatherId = btn.getAttribute('data-weather');
+      });
+    });
+  }
+
+  bindCardEvents() {
     this.cards.forEach((card) => {
       card.addEventListener('click', () => {
         this.cards.forEach(c => c.classList.remove('selected'));
@@ -56,14 +67,6 @@ export class MenuManager {
           this.preview.setAircraft(this.selectedAircraftId);
         }
         this.updateSpecsPanel();
-      });
-    });
-
-    this.weatherBtns.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        this.weatherBtns.forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-        this.selectedWeatherId = btn.getAttribute('data-weather');
       });
     });
   }
@@ -168,7 +171,7 @@ export class MenuManager {
       this.selectedAircraftId = firstId;
     }
     this.cards = Array.from(document.querySelectorAll('.aircraft-card'));
-    this.bindEvents();
+    this.bindCardEvents();
   }
 
   update(deltaTime) {}

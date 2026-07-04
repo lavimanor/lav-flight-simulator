@@ -28,7 +28,9 @@ export class ILSIndicator {
     const idealRelativeAltitude = Math.tan(idealAngleRad) * approachDistanceZ;
     const altitudeDifference = dy - idealRelativeAltitude;
     const glideslopeDevNorm = THREE.MathUtils.clamp(altitudeDifference / 60.0, -1.0, 1.0);
-    const localizerPercent = 50 + (localizerDevNorm * 40);
+    // Fly-to needle: when the aircraft drifts to the pilot's right of the
+    // centerline (dx > 0 on this approach heading), the needle deflects left.
+    const localizerPercent = 50 - (localizerDevNorm * 40);
     this.localizerBar.style.left = `${localizerPercent}%`;
     const glideslopePercent = 50 + (glideslopeDevNorm * 40);
     this.glideslopeBar.style.top = `${glideslopePercent}%`;

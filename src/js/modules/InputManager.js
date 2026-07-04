@@ -51,7 +51,8 @@ export class InputManager {
           console.log(`[InputManager] Wheel Brakes toggled: ${aircraft.controls.brakes}`);
         }
         if (e.code === 'KeyR' && aircraft.isCrashed) {
-          aircraft.spawn(this.engine.scene, new THREE.Vector3(0, 181.2, -500));
+          const restY = 180.0 + (aircraft.config.groundClearanceOffset ?? 1.2);
+          aircraft.spawn(this.engine.scene, new THREE.Vector3(0, restY, -500));
           const cameraManager = this.engine.moduleManager.get('Camera');
           if (cameraManager) {
             cameraManager.isFirstFrame = true;

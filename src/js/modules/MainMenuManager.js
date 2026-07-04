@@ -124,7 +124,9 @@ export class MainMenuManager {
     // 4. Safely respawn / park aircraft back on the flat runway plateau coordinates
     const aircraftManager = this.engine.moduleManager.get('Aircraft');
     if (aircraftManager && aircraftManager.activeAircraft) {
-      aircraftManager.activeAircraft.spawn(this.engine.scene, new THREE.Vector3(0, 181.2, -500));
+      const aircraft = aircraftManager.activeAircraft;
+      const restY = 180.0 + (aircraft.config.groundClearanceOffset ?? 1.2);
+      aircraft.spawn(this.engine.scene, new THREE.Vector3(0, restY, -500));
     }
 
     console.log(`[MainMenuManager] Returned to pre-flight menu. Reset aircraft on runway.`);

@@ -63,7 +63,8 @@ export class CameraManager {
     }
 
     const gBuffet = Math.max(Math.abs(aircraft.gForce - 1.0) - 3.5, 0.0) * 0.08;
-    const stallSpeed = aircraft.config.stallSpeed ?? (isJet ? 28.0 : 14.0);
+    // Prefer the live stall speed computed by the physics (weight/density aware).
+    const stallSpeed = aircraft.stallSpeedIAS ?? aircraft.config.stallSpeed ?? (isJet ? 28.0 : 14.0);
     let stallBuffet = 0.0;
 
     const terrainManager = this.engine.moduleManager.get('Terrain');

@@ -86,11 +86,8 @@ export class AircraftBase {
     scene.add(this.group);
   }
   update(deltaTime) {
-    if (this.engineOn && this.fuel > 0) {
-      this.engineSpool = THREE.MathUtils.lerp(this.engineSpool, 1.0, 1.8 * deltaTime);
-    } else {
-      this.engineSpool = THREE.MathUtils.lerp(this.engineSpool, 0.0, 2.5 * deltaTime);
-    }
+    // engineSpool is integrated by PropulsionSolver (via the physics solve below);
+    // updating it here as well would double the spool rate.
     const rpmScaling = (this.controls.throttle * 75 + 5) * this.engineSpool + (this.airspeed * 0.4 * (1.0 - this.engineSpool));
     if (this.propellerGroup) {
       this.propellerGroup.rotation.z += rpmScaling * deltaTime;

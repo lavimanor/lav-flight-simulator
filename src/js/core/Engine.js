@@ -50,7 +50,9 @@ export class Engine {
   }
   tick() {
     const currentTime = performance.now();
-    const deltaTime = (currentTime - this.lastTime) / 1000;
+    // Clamp so a suspended tab / long stall can't feed a huge step into the
+    // modules (lerp factors above 1 extrapolate and destabilize the sim).
+    const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.1);
     this.lastTime = currentTime;
     for (const module of this.modules) {
       if (typeof module.update === 'function') {
