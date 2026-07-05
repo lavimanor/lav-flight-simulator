@@ -155,25 +155,42 @@ export class FlightPhysicsSolver {
 
     // --- Aerodynamic + propulsive forces ------------------------------------
     const thrustMag = PropulsionSolver.solve(aircraft, airDensity, dt);
-    const { liftMagnitude } = LiftSolver.solve(aircraft, airDensity, geLiftMultiplier, aoaRad, V);
-    const dragMag = DragSolver.solve(aircraft, airDensity, aoaRad, speedOfSound, heightAboveGround, dt, V);
+    const { liftMagnitude, CL } = LiftSolver.solve(aircraft, airDensity, geLiftMultiplier, aoaRad, V, machNumber);
+    const dragMag = DragSolver.solve(aircraft, airDensity, CL, speedOfSound, heightAboveGround, dt, V);
 
-    const netForce = new THREE.Vector3();
-    netForce.addScaledVector(forward, thrustMag);         // thrust along the nose
-    netForce.y -= weightN;                                // gravity
+    // Everything except gravity goes into aeroForce first, so the felt load
+    // factor (what bends wings and blacks out pilots) can be measured from the
+    // real acceleration instead of guessed from lift alone.
+    const aeroForce = new THREE.Vector3();
+    aeroForce.addScaledVector(forward, thrustMag);        // thrust along the nose
 
     if (V > 0.5) {
       const airflowDir = relVel.clone().multiplyScalar(1 / V);
       // Drag opposes the direction of travel through the air.
-      netForce.addScaledVector(airflowDir, -dragMag);
+      aeroForce.addScaledVector(airflowDir, -dragMag);
       // Lift is perpendicular to the relative airflow, on the wing's "up" side.
       let side = up.clone().cross(airflowDir);
       if (side.lengthSq() < 1e-6) side = port.clone();
       side.normalize();
       const liftDir = airflowDir.clone().cross(side).normalize();
       if (liftDir.dot(up) < 0) liftDir.negate();
-      netForce.addScaledVector(liftDir, liftMagnitude);
+      aeroForce.addScaledVector(liftDir, liftMagnitude);
+
+      // Fuselage/fin side force: sideslip pushes the airframe sideways, which is
+      // what makes a forward slip actually displace the flight path and gives
+      // skidding turns their sag. Airflow arriving from the port side (+beta)
+      // shoves the aircraft to starboard (-port).
+      const sideForceCoefPerRad = 0.35;
+      const qDyn = 0.5 * airDensity * V * V;
+      aeroForce.addScaledVector(port, -qDyn * config.wingArea * sideForceCoefPerRad * sideslipRad);
     }
+
+    // Felt load factor: non-gravitational acceleration along the pilot's spine.
+    // Reads +1 in level flight, 0 at the top of a pushover, -1 inverted.
+    const rawLoadFactor = weightN > 0 ? aeroForce.dot(up) / weightN : 1.0;
+
+    const netForce = aeroForce.clone();
+    netForce.y -= weightN;                                // gravity
 
     const accel = netForce.multiplyScalar(1 / currentMass);
     // Safety clamp so a pathological frame can never launch the aircraft.
@@ -285,10 +302,14 @@ export class FlightPhysicsSolver {
     const stallFactor = aircraft.isStalled ? 0.35 : 1.0;
 
     if (aircraft.isStalled) {
-      // A stalled wing drops its nose; asymmetry can develop into a spin.
-      aircraft.angularVelocity.x += 0.6 * dt;
-      aircraft.angularVelocity.x += (Math.random() - 0.5) * 6.0 * dt;
-      aircraft.angularVelocity.z += (Math.random() - 0.5) * 6.0 * dt;
+      // A stalled wing drops its nose. Buffet is turbulence-like shaking (from
+      // the separated flow beating on the tail), not white noise, and any
+      // sideslip makes one wing stall deeper and drop first.
+      const tBuffet = performance.now() * 0.004;
+      const buffetX = FlightPhysicsSolver.noise.noise2D(tBuffet, 17.3) - 0.5;
+      const buffetZ = FlightPhysicsSolver.noise.noise2D(tBuffet, 91.7) - 0.5;
+      aircraft.angularVelocity.x += (0.6 + buffetX * 5.0) * dt;
+      aircraft.angularVelocity.z += (buffetZ * 5.0 + 1.6 * sideslipRad) * dt;
       if (!aircraft.isSpinning && (Math.abs(aircraft.controls.roll) > 0.5 || Math.abs(aircraft.controls.yaw) > 0.5)) {
         aircraft.isSpinning = true;
         // +1 = spin to the right (matches D / E input direction).
@@ -324,8 +345,8 @@ export class FlightPhysicsSolver {
       pitchYawAuthority = Math.max(authority, Math.min(tv, 1.0) * stallFactor);
     }
 
-    // Simple G-limiter: nose-up command fades as the load factor approaches the
-    // airframe limit from the config (pitchGScale).
+    // G-limiter part 1 (feedback): nose-up command fades as the measured load
+    // factor approaches the airframe limit from the config (pitchGScale).
     const gLimit = config.pitchGScale ?? 6.0;
     let pitchCmdEff = pitchCmd;
     if (pitchCmd > 0 && aircraft.gForce > gLimit - 0.5) {
@@ -346,6 +367,8 @@ export class FlightPhysicsSolver {
     const stabScale = THREE.MathUtils.clamp(V / 30.0, 0.0, 1.5) * stallFactor;
     const dihedralGain = config.dihedral ?? 1.0; // per-type (flying wings & high-wings are stiffer)
     pitchRateTarget += T.pitchStability * (aoaRad - T.aoaTrim) * stabScale;       // AoA above trim -> nose down (+X)
+    // Deploying flaps shifts the center of lift aft, trimming the nose down a touch.
+    pitchRateTarget += 0.04 * aircraft.flapsStage * stabScale;                    // +X = nose down
     yawRateTarget += T.yawStability * sideslipRad * stabScale;                    // yaw toward the airflow (+Y = toward +X)
     rollRateTarget += -T.dihedral * dihedralGain * sideslipRad * stabScale;       // lateral stability -> level the wings
 
@@ -360,6 +383,40 @@ export class FlightPhysicsSolver {
     // the nose opposite to the roll. Props show it more than jets with spoilers.
     const adverseGain = isJet ? 0.5 : 1.0;
     yawRateTarget += T.adverseYaw * adverseGain * rollCmd * config.rollRate * authority; // roll right (+) -> yaw left (+Y)
+
+    // Propeller left-turning tendencies: engine torque rolls opposite the prop's
+    // rotation, and P-factor/spiraling slipstream yaw the nose left, strongest at
+    // high power and low airspeed. A touch of right rudder on climb-out fixes it.
+    if (!isJet && !onGround) {
+      const powerFrac = aircraft.controls.throttle * aircraft.engineSpool;
+      // Scaled by thrust-to-weight: a light single feels its engine far more
+      // than a heavy four-engine turboprop does.
+      const twr = THREE.MathUtils.clamp((config.maxThrust ?? 0) / Math.max(weightN, 1), 0.0, 1.0);
+      const lowSpeedFactor = THREE.MathUtils.clamp(45.0 / Math.max(V, 15.0), 0.4, 3.0);
+      yawRateTarget += 0.030 * powerFrac * twr * lowSpeedFactor;   // yaw LEFT (+Y)
+      rollRateTarget -= 0.018 * powerFrac * twr * lowSpeedFactor;  // roll LEFT (-Z)
+    }
+
+    // G-limiter part 2 (command shaping): a steady pitch rate q at speed V pulls
+    // roughly n = up_y + q*V/g, so the commanded rate is capped at what the
+    // airframe tolerates. This is why real jets feel crisp at low speed but can
+    // only creep the nose around at 500 knots.
+    if (!onGround) {
+      const negGLimit = -Math.max(0.35 * gLimit, 1.0);                 // structural negative-G limit
+      const qMaxUp = 9.81 * (gLimit - up.y) / Math.max(V, 20.0);       // nose-up is -X
+      const qMaxDown = 9.81 * (up.y - negGLimit) / Math.max(V, 20.0);  // nose-down is +X
+      pitchRateTarget = THREE.MathUtils.clamp(pitchRateTarget, -qMaxUp, qMaxDown);
+    }
+
+    // Angle-of-attack limiter: fly-by-wire types refuse to command past the
+    // stalling angle (the F-16's blended g/AoA limiter). Conventional aircraft
+    // get no such protection and will stall if hauled back hard.
+    const flyByWire = config.flyByWire ?? ['f16', 'f22', 'f35', 'b2'].includes(config.id);
+    if (flyByWire && !onGround && pitchRateTarget < 0) { // negative X = nose up
+      const aoaMax = Aerodynamics.criticalAoA * 0.92;
+      const aoaRoom = THREE.MathUtils.clamp((aoaMax - aoaRad) / (0.30 * aoaMax), 0.0, 1.0);
+      pitchRateTarget *= aoaRoom;
+    }
 
     // Tail-strike protection: near the ground, the commanded nose-up rate fades
     // to zero as pitch approaches the attitude at which the tail would touch
@@ -416,11 +473,14 @@ export class FlightPhysicsSolver {
     aircraft.angularVelocity.z = THREE.MathUtils.clamp(aircraft.angularVelocity.z, -4.0, 4.0);
 
     if (weatherManager && weatherManager.turbulenceIntensity > 0 && windEnabled && !onGround) {
+      // Fractal noise rather than sinusoids: real turbulence has gusty lulls and
+      // sharp-edged bumps, not a metronome wobble.
       const tIntensity = weatherManager.turbulenceIntensity;
-      const time = performance.now() * 0.012;
-      aircraft.angularVelocity.x += Math.sin(time * 3.7) * 2.0 * tIntensity * dt;
-      aircraft.angularVelocity.z += Math.cos(time * 4.9) * 3.5 * tIntensity * dt;
-      aircraft.angularVelocity.y += Math.sin(time * 2.3) * 1.0 * tIntensity * dt;
+      const tTurb = performance.now() * 0.0009;
+      const nz = FlightPhysicsSolver.noise;
+      aircraft.angularVelocity.x += (nz.fbm2D(tTurb * 3.1, 7.7, 3) - 0.5) * 4.5 * tIntensity * dt;
+      aircraft.angularVelocity.z += (nz.fbm2D(tTurb * 4.3, 23.1, 3) - 0.5) * 7.5 * tIntensity * dt;
+      aircraft.angularVelocity.y += (nz.fbm2D(tTurb * 2.2, 47.9, 3) - 0.5) * 2.2 * tIntensity * dt;
     }
 
     aircraft.group.rotateX(aircraft.angularVelocity.x * dt);
@@ -444,8 +504,10 @@ export class FlightPhysicsSolver {
     aircraft.quaternion.copy(aircraft.group.quaternion);
 
     // --- G-force, physiological effects, instruments -------------------------
-    const targetG = onGround ? 1.0 : (weightN > 0 ? liftMagnitude / weightN : 1.0);
-    aircraft.gForce = THREE.MathUtils.lerp(aircraft.gForce || 1.0, THREE.MathUtils.clamp(targetG, -4.0, 12.0), 6.0 * dt);
+    // On the wheels the struts carry the weight (1 g); in the air the meter reads
+    // the felt load factor measured from the actual forces, correct inverted too.
+    const targetG = onGround ? 1.0 : rawLoadFactor;
+    aircraft.gForce = THREE.MathUtils.lerp(aircraft.gForce || 1.0, THREE.MathUtils.clamp(targetG, -4.0, 12.0), 10.0 * dt);
 
     if (aircraft.gForce > 3.8) {
       aircraft.blackout = Math.min(aircraft.blackout + ((aircraft.gForce - 3.8) / 3.7) * dt * 0.4, 1.0);
@@ -469,6 +531,12 @@ export class FlightPhysicsSolver {
     let degHeading = Math.round(yawAngle * (180 / Math.PI));
     if (degHeading < 0) degHeading += 360;
     aircraft.heading = degHeading;
+
+    // Extra readouts for the HUD/debug displays.
+    aircraft.aoaDeg = aoaRad * (180 / Math.PI);
+    aircraft.sideslipDeg = sideslipRad * (180 / Math.PI);
+    aircraft.machNumber = machNumber;
+    aircraft.heightAGL = aircraft.position.y - terrainNow;
   }
 
   static getTerrainHeightAt(worldX, worldZ) {

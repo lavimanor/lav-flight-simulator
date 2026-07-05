@@ -61,6 +61,8 @@ export class HudManager {
     // Cache Advanced elements
     this.fuelVal = document.getElementById('hud-fuel-val');
     this.gForceVal = document.getElementById('hud-gforce-val');
+    this.aoaVal = document.getElementById('hud-aoa-val');
+    this.machVal = document.getElementById('hud-mach-val');
     this.blackoutOverlay = document.getElementById('hud-blackout-overlay');
     this.redoutOverlay = document.getElementById('hud-redout-overlay');
     this.stallWarning = document.getElementById('hud-stall-warning');
@@ -146,7 +148,23 @@ export class HudManager {
         headingString = headingString + '°';
 
         // Populate readouts
-        if (this.speedVal) this.speedVal.textContent = speedKnots;
+        if (this.speedVal) {
+          this.speedVal.textContent = speedKnots;
+          // Slow-speed awareness: amber inside 15% of stall IAS, red below it.
+          const stallKnots = (aircraft.stallSpeedIAS ?? 0) * 1.94384;
+          const airborne = (aircraft.heightAGL ?? 0) > 3.0 && !aircraft.isCrashed;
+          if (stallKnots > 0 && airborne) {
+            if (speedKnots < stallKnots) {
+              this.speedVal.style.color = '#ff5555';
+            } else if (speedKnots < stallKnots * 1.15) {
+              this.speedVal.style.color = '#ffea00';
+            } else {
+              this.speedVal.style.color = '';
+            }
+          } else {
+            this.speedVal.style.color = '';
+          }
+        }
         if (this.altitudeVal) this.altitudeVal.textContent = altitudeFeet;
         if (this.headingVal) this.headingVal.textContent = headingString;
         if (this.throttleVal) this.throttleVal.textContent = `${throttlePercent}%`;
@@ -200,6 +218,18 @@ export class HudManager {
         if (this.gForceVal) {
           this.gForceVal.textContent = `${aircraft.gForce.toFixed(1)} G`;
           this.gForceVal.style.color = (aircraft.gForce > 5.0 || aircraft.gForce < 0.2) ? '#ffea00' : '#00ff66';
+        }
+
+        // New aerodynamic readouts from the physics solver
+        if (this.aoaVal) {
+          const aoa = aircraft.aoaDeg ?? 0;
+          this.aoaVal.textContent = `${aoa.toFixed(1)}°`;
+          this.aoaVal.style.color = aoa > 12.0 ? '#ff5555' : (aoa > 9.0 ? '#ffea00' : '#00ff66');
+        }
+        if (this.machVal) {
+          const mach = aircraft.machNumber ?? 0;
+          this.machVal.textContent = mach.toFixed(2);
+          this.machVal.style.color = (mach > 0.92 && mach < 1.1) ? '#ffea00' : '#00ff66';
         }
 
         // Physiological Vision Overlays Opacities

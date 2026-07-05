@@ -21,6 +21,8 @@
   "pitchGScale": 2.5,
   "dihedral": 1.3,
   "dimensions": { "span": 40.4, "length": 29.8, "height": 11.6 },
+  "groundClearanceOffset": 3.24,
+  "bellyClearance": 2.78,
   "camera": {
     "offsetX": 0.0,
     "offsetY": 8.5,

@@ -65,6 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     moduleManager.initAll();
     engine.start();
+
+    // Debug handle for DevTools / automated smoke tests.
+    window.__sim = { engine, moduleManager };
   } catch (error) {
     console.error("Initialization failure during startup setup:", error);
     const overlay = document.getElementById('hud-overlay');

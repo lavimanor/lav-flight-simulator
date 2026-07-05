@@ -55,6 +55,24 @@ export class AircraftMeshBuilder {
     } else {
       this.buildTrainer(aircraft);
     }
+
+    // Calibrate the built model to the physics dimensions. The solver's
+    // wingtip/nose/tail crash probes and ground effect all use
+    // config.dimensions, so the visual model must occupy the same envelope
+    // or collisions appear to happen in mid-air. groundClearanceOffset in the
+    // config must equal the scaled wheel-bottom height (checked by
+    // scripts/physics-test/audit-models.mjs).
+    if (aircraft.config.dimensions) {
+      const bbox = new THREE.Box3().setFromObject(originalGroup);
+      const size = bbox.getSize(new THREE.Vector3());
+      if (size.x > 0.1 && size.z > 0.1) {
+        const sx = aircraft.config.dimensions.span / size.x;
+        const sz = aircraft.config.dimensions.length / size.z;
+        const sy = Math.sqrt(sx * sz); // keep vertical proportions plausible
+        aircraft.visualGroup.scale.multiply(new THREE.Vector3(sx, sy, sz));
+      }
+    }
+
     aircraft.group = originalGroup;
   }
   static loadCustomModel(aircraft) {
@@ -289,16 +307,10 @@ export class AircraftMeshBuilder {
     rightFlame.position.set(0.25, 0, -4.5);
     aircraft.afterburnerGroup.add(rightFlame);
 
-    // Large leading-edge extensions (LEX) — the Hornet's signature.
-    const lexGeo = new THREE.BoxGeometry(0.65, 0.05, 2.6);
-    const leftLex = new THREE.Mesh(lexGeo, fuselageMat);
-    leftLex.position.set(-0.5, 0.06, 1.3);
-    leftLex.rotation.y = 0.36;
-    aircraft.group.add(leftLex);
-    const rightLex = new THREE.Mesh(lexGeo, fuselageMat);
-    rightLex.position.set(0.5, 0.06, 1.3);
-    rightLex.rotation.y = -0.36;
-    aircraft.group.add(rightLex);
+    // Large leading-edge extensions (LEX) — the Hornet's signature. Blended
+    // strakes running from the nose back into the wing roots.
+    this.addLerx(aircraft.group, fuselageMat, 1, { xRoot: 0.4, xTip: 1.25, zRoot: 0.3, zFront: 3.1, y: 0.05 });
+    this.addLerx(aircraft.group, fuselageMat, -1, { xRoot: 0.4, xTip: 1.25, zRoot: 0.3, zFront: 3.1, y: 0.05 });
 
     // Twin side intakes.
     const intakeGeo = new THREE.BoxGeometry(0.5, 0.5, 2.0);
@@ -465,26 +477,28 @@ export class AircraftMeshBuilder {
       aircraft.group.add(propGroup);
       aircraft.cargoPropellers.push(propGroup);
     });
-    const strutGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.4, 8);
+    // Stubby airlifter gear: wheels tucked close to the belly so the fuselage
+    // does not tower over the runway once the model is scaled to full size.
+    const strutGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.0, 8);
     const tireGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.35, 12);
     tireGeo.rotateZ(Math.PI / 2);
     const noseStrutMesh = new THREE.Mesh(strutGeo, metalMat);
-    noseStrutMesh.position.set(0, -1.0, 4.2);
+    noseStrutMesh.position.set(0, -0.5, 4.2);
     aircraft.gearGroup.add(noseStrutMesh);
     const noseWheel = new THREE.Mesh(tireGeo, tireMat);
-    noseWheel.position.set(0, -1.7, 4.2);
+    noseWheel.position.set(0, -0.85, 4.2);
     aircraft.gearGroup.add(noseWheel);
     const leftStrutMesh = new THREE.Mesh(strutGeo, metalMat);
-    leftStrutMesh.position.set(-1.4, -1.0, -0.6);
+    leftStrutMesh.position.set(-1.4, -0.5, -0.6);
     aircraft.gearGroup.add(leftStrutMesh);
     const leftWheel = new THREE.Mesh(tireGeo, tireMat);
-    leftWheel.position.set(-1.5, -1.7, -0.6);
+    leftWheel.position.set(-1.5, -0.85, -0.6);
     aircraft.gearGroup.add(leftWheel);
     const rightStrutMesh = new THREE.Mesh(strutGeo, metalMat);
-    rightStrutMesh.position.set(1.4, -1.0, -0.6);
+    rightStrutMesh.position.set(1.4, -0.5, -0.6);
     aircraft.gearGroup.add(rightStrutMesh);
     const rightWheel = new THREE.Mesh(tireGeo, tireMat);
-    rightWheel.position.set(1.5, -1.7, -0.6);
+    rightWheel.position.set(1.5, -0.85, -0.6);
     aircraft.gearGroup.add(rightWheel);
 
     // Upswept rear cargo ramp under the tail.
@@ -513,61 +527,71 @@ export class AircraftMeshBuilder {
     const metalMat = new THREE.MeshStandardMaterial({ color: 0x6b7075, roughness: 0.3, metalness: 0.8 });
     const tireMat = new THREE.MeshStandardMaterial({ color: 0x0d0d0d, roughness: 0.9 });
 
-    const halfSpan = 16.0;
+    // --- Flying-wing planform (top view, +z = nose, +x = port) ---
+    // The B-2's signature is a straight-swept leading edge running out to a
+    // sharp wingtip, and a "double-W" sawtooth trailing edge. Build it as one
+    // solid extruded polygon so the silhouette is correct from every angle,
+    // instead of two crossed boxes that the calibration step then shears.
+    const NOSE = 10.6, TIP_X = 26.0, TIP_Z = -3.2, AFT = -8.6;
+    const halfTE = [            // trailing edge from wingtip in to centreline
+      [TIP_X, TIP_Z],
+      [20.5, -6.6],
+      [16.0, -4.2],
+      [10.6, -7.5],
+      [5.2, -5.0],
+      [0, AFT]
+    ];
+    const shape = new THREE.Shape();
+    shape.moveTo(0, NOSE);                       // nose point
+    shape.lineTo(TIP_X, TIP_Z);                  // port leading edge
+    for (const [x, z] of halfTE.slice(1)) shape.lineTo(x, z); // port sawtooth TE
+    for (let i = halfTE.length - 2; i >= 0; i--) {            // starboard sawtooth TE
+      shape.lineTo(-halfTE[i][0], halfTE[i][1]);
+    }
+    shape.lineTo(0, NOSE);                        // starboard leading edge back to nose
+    const thick = 0.9;
+    const wingGeo = new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false });
+    wingGeo.rotateX(Math.PI / 2);                // planform into XZ, thickness along -Y
+    wingGeo.translate(0, thick / 2, 0);          // centre the slab on y = 0
+    const wing = new THREE.Mesh(wingGeo, wingMat);
+    aircraft.group.add(wing);
 
-    // --- Swept wings that form the main delta planform ---
-    const makeWing = (sign) => {
-      const geo = new THREE.BoxGeometry(halfSpan, 0.28, 5.5);
-      geo.translate(sign * halfSpan / 2, 0, 0);   // inboard edge at centreline
-      const wing = new THREE.Mesh(geo, wingMat);
-      wing.position.set(0, 0, -0.4);
-      wing.rotation.y = sign * 0.62;              // ~35deg leading-edge sweep
-      aircraft.group.add(wing);
-    };
-    makeWing(-1);
-    makeWing(1);
-
-    // Raised blended centre spine over the wing roots.
-    const body = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.9, 7.5), bodyMat);
-    body.position.set(0, 0.25, 0.2);
+    // Blended centre body: a raised dome giving the fuselage its volume and
+    // hiding the flat slab's centre seam. Sat so its underside stays flush with
+    // the wing so the aircraft keeps the flying-wing's flat belly.
+    const bodyGeo = new THREE.SphereGeometry(1, 20, 14);
+    bodyGeo.scale(3.6, 1.4, 8.6);
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.set(0, 0.95, 1.2);
     aircraft.group.add(body);
 
-    // Pointed nose chine (flattened 4-sided cone), same pattern as the F35 nose.
-    const noseGeo = new THREE.ConeGeometry(2.5, 4.6, 4);
-    noseGeo.rotateX(Math.PI / 2);
-    noseGeo.rotateZ(Math.PI / 4);
-    noseGeo.scale(1, 0.3, 1);
-    const nose = new THREE.Mesh(noseGeo, bodyMat);
-    nose.position.set(0, 0.12, 4.2);
-    aircraft.group.add(nose);
-
-    // Central beavertail point at the trailing edge (flat triangle pointing aft).
-    const tailGeo = new THREE.ConeGeometry(1.5, 3.2, 4);
-    tailGeo.rotateX(-Math.PI / 2);
-    tailGeo.rotateZ(Math.PI / 4);
-    tailGeo.scale(1, 0.15, 1);
-    const beaverTail = new THREE.Mesh(tailGeo, wingMat);
-    beaverTail.position.set(0, 0.02, -3.2);
-    aircraft.group.add(beaverTail);
-
-    // Cockpit blister.
-    const cockpitGeo = new THREE.SphereGeometry(0.9, 16, 12);
-    cockpitGeo.scale(1.0, 0.5, 1.7);
+    // Cockpit canopy: a low faceted blister riding the spine near the nose.
+    const cockpitGeo = new THREE.SphereGeometry(0.95, 16, 10);
+    cockpitGeo.scale(1.0, 0.55, 1.8);
     const cockpit = new THREE.Mesh(cockpitGeo, glassMat);
-    cockpit.position.set(0, 0.62, 2.6);
+    cockpit.position.set(0, 1.75, 5.4);
     aircraft.group.add(cockpit);
 
-    // Engine intake humps and exhaust troughs (4 buried engines, top-mounted).
-    const intakeGeo = new THREE.BoxGeometry(1.3, 0.42, 2.0);
-    const exhGeo = new THREE.BoxGeometry(1.1, 0.18, 1.3);
-    [-2.2, -0.85, 0.85, 2.2].forEach((x) => {
+    // Top-mounted engine intakes and rear exhaust slots (two banks of two).
+    const intakeGeo = new THREE.BoxGeometry(1.6, 0.5, 2.4);
+    const exhGeo = new THREE.BoxGeometry(1.4, 0.2, 1.6);
+    [-3.4, -1.5, 1.5, 3.4].forEach((x) => {
       const intake = new THREE.Mesh(intakeGeo, bodyMat);
-      intake.position.set(x, 0.55, 0.7);
+      intake.position.set(x, 0.7, 1.8);
       aircraft.group.add(intake);
       const exh = new THREE.Mesh(exhGeo, exhaustMat);
-      exh.position.set(x, 0.22, -2.5);
+      exh.position.set(x, 0.5, -2.2);
       aircraft.group.add(exh);
     });
+
+    // Wingtip nav lights: red on the port (+X) tip, green on starboard (-X).
+    const navGeo = new THREE.SphereGeometry(0.35, 8, 8);
+    const redNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0xff2222 }));
+    redNav.position.set(TIP_X - 0.5, 0.1, TIP_Z);
+    aircraft.group.add(redNav);
+    const greenNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0x22ff22 }));
+    greenNav.position.set(-(TIP_X - 0.5), 0.1, TIP_Z);
+    aircraft.group.add(greenNav);
 
     // --- Retractable landing gear: nose + two multi-wheel mains ---
     const strutGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.4, 8);
@@ -683,15 +707,8 @@ export class AircraftMeshBuilder {
     aircraft.group.add(intakeLip);
 
     // LERX strakes blending the nose into the wing roots.
-    const strakeGeo = new THREE.BoxGeometry(0.55, 0.05, 2.4);
-    const leftStrake = new THREE.Mesh(strakeGeo, bodyMat);
-    leftStrake.position.set(-0.45, 0.03, 1.7);
-    leftStrake.rotation.y = 0.32;
-    aircraft.group.add(leftStrake);
-    const rightStrake = new THREE.Mesh(strakeGeo, bodyMat);
-    rightStrake.position.set(0.45, 0.03, 1.7);
-    rightStrake.rotation.y = -0.32;
-    aircraft.group.add(rightStrake);
+    this.addLerx(aircraft.group, bodyMat, 1, { xRoot: 0.32, xTip: 1.0, zRoot: 0.2, zFront: 3.4, y: 0.03 });
+    this.addLerx(aircraft.group, bodyMat, -1, { xRoot: 0.32, xTip: 1.0, zRoot: 0.2, zFront: 3.4, y: 0.03 });
 
     // Ventral fins under the tail.
     const ventralGeo = new THREE.BoxGeometry(0.05, 0.55, 0.9);
@@ -818,16 +835,9 @@ export class AircraftMeshBuilder {
     belly.position.set(0, -0.42, 0.4);
     aircraft.group.add(belly);
 
-    // Leading-edge root chines.
-    const chineGeo = new THREE.BoxGeometry(0.9, 0.06, 2.8);
-    const leftChine = new THREE.Mesh(chineGeo, bodyMat);
-    leftChine.position.set(-0.68, 0.05, 2.0);
-    leftChine.rotation.y = 0.26;
-    aircraft.group.add(leftChine);
-    const rightChine = new THREE.Mesh(chineGeo, bodyMat);
-    rightChine.position.set(0.68, 0.05, 2.0);
-    rightChine.rotation.y = -0.26;
-    aircraft.group.add(rightChine);
+    // Leading-edge root chines blending the nose into the wing roots.
+    this.addLerx(aircraft.group, bodyMat, 1, { xRoot: 0.42, xTip: 1.15, zRoot: 0.35, zFront: 3.5, y: 0.05 });
+    this.addLerx(aircraft.group, bodyMat, -1, { xRoot: 0.42, xTip: 1.15, zRoot: 0.35, zFront: 3.5, y: 0.05 });
 
     this.configureShadows(aircraft.group);
   }
@@ -934,15 +944,8 @@ export class AircraftMeshBuilder {
     aircraft.group.add(rightIntake);
 
     // Leading-edge root extensions (chines) blending the nose into the wings.
-    const lerxGeo = new THREE.BoxGeometry(1.0, 0.06, 3.2);
-    const leftLerx = new THREE.Mesh(lerxGeo, bodyMat);
-    leftLerx.position.set(-0.75, 0.06, 2.1);
-    leftLerx.rotation.y = 0.28;
-    aircraft.group.add(leftLerx);
-    const rightLerx = new THREE.Mesh(lerxGeo, bodyMat);
-    rightLerx.position.set(0.75, 0.06, 2.1);
-    rightLerx.rotation.y = -0.28;
-    aircraft.group.add(rightLerx);
+    this.addLerx(aircraft.group, bodyMat, 1, { xRoot: 0.48, xTip: 1.3, zRoot: 0.4, zFront: 3.7, y: 0.06 });
+    this.addLerx(aircraft.group, bodyMat, -1, { xRoot: 0.48, xTip: 1.3, zRoot: 0.4, zFront: 3.7, y: 0.06 });
 
     // Dorsal spine.
     const spine = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 4.0), bodyMat);
@@ -950,6 +953,27 @@ export class AircraftMeshBuilder {
     aircraft.group.add(spine);
 
     this.configureShadows(aircraft.group);
+  }
+  // A leading-edge root extension (LERX/strake): a thin flat triangle that
+  // tapers from a point near the nose back to the wing-root leading edge,
+  // hugging the fuselage. Built as a solid so it blends into the wing instead
+  // of splaying outward like a canard foreplane.
+  static addLerx(group, mat, side, { xRoot, xTip, zRoot, zFront, y = 0.04, thick = 0.06 }) {
+    const pts = [
+      [side * xRoot, zRoot],   // inboard, at the wing-root leading edge
+      [side * xTip, zRoot],    // outboard, at the wing-root leading edge
+      [side * xRoot, zFront]   // forward point, near the nose
+    ];
+    if (side < 0) pts.reverse(); // keep winding CCW so the top face lights correctly
+    const shape = new THREE.Shape();
+    shape.moveTo(pts[0][0], pts[0][1]);
+    shape.lineTo(pts[1][0], pts[1][1]);
+    shape.lineTo(pts[2][0], pts[2][1]);
+    shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false });
+    geo.rotateX(Math.PI / 2);       // planform into XZ, thickness along -Y
+    geo.translate(0, y + thick / 2, 0);
+    group.add(new THREE.Mesh(geo, mat));
   }
   static configureShadows(group) {
     group.traverse((child) => {

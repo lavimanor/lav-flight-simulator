@@ -44,5 +44,6 @@
     "y": 0.0,
     "z": 0.0
   },
-  "groundClearanceOffset": 1.2
+  "groundClearanceOffset": 1.95,
+  "bellyClearance": 0.82
 }

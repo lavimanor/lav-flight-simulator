@@ -92,9 +92,17 @@ export class HangarPreview {
       this.cargoPropellers = mockAircraft.cargoPropellers;
     }
 
-    const scale = configId === 'cargo' ? 0.35 : (configId === 'fighter' ? 0.65 : 0.8);
-    mockAircraft.group.scale.set(scale, scale, scale);
+    // Fit-to-view: models are built at true physical size (a 52 m B-2 and a
+    // 6 m stunt plane), so frame each one by its bounding box instead of
+    // hand-tuned magic scales.
     mockAircraft.group.rotation.set(0.15, -Math.PI / 4, -0.05);
+    const bbox = new THREE.Box3().setFromObject(mockAircraft.group);
+    const size = bbox.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = maxDim > 0.001 ? 7.0 / maxDim : 1.0;
+    mockAircraft.group.scale.setScalar(scale);
+    const center = bbox.getCenter(new THREE.Vector3());
+    mockAircraft.group.position.copy(center).multiplyScalar(-scale);
 
     this.previewGroup.add(mockAircraft.group);
   }
