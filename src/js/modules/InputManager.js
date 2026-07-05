@@ -51,13 +51,7 @@ export class InputManager {
           console.log(`[InputManager] Wheel Brakes toggled: ${aircraft.controls.brakes}`);
         }
         if (e.code === 'KeyR' && aircraft.isCrashed) {
-          const restY = 180.0 + (aircraft.config.groundClearanceOffset ?? 1.2);
-          aircraft.spawn(this.engine.scene, new THREE.Vector3(0, restY, -500));
-          const cameraManager = this.engine.moduleManager.get('Camera');
-          if (cameraManager) {
-            cameraManager.isFirstFrame = true;
-          }
-          console.log(`[InputManager] Aircraft respawned and camera snapped.`);
+          this.respawnAircraft(aircraft);
         }
       }
     }
@@ -65,6 +59,16 @@ export class InputManager {
 
   handleKeyUp(e) {
     this.keys[e.code] = false;
+  }
+
+  respawnAircraft(aircraft) {
+    const restY = 180.0 + (aircraft.config.groundClearanceOffset ?? 1.2);
+    aircraft.spawn(this.engine.scene, new THREE.Vector3(0, restY, -500));
+    const cameraManager = this.engine.moduleManager.get('Camera');
+    if (cameraManager) {
+      cameraManager.isFirstFrame = true;
+    }
+    console.log(`[InputManager] Aircraft respawned on runway.`);
   }
 
   update(deltaTime) {
@@ -78,49 +82,113 @@ export class InputManager {
     if (!this.aircraftManager || !this.aircraftManager.activeAircraft) return;
 
     const aircraft = this.aircraftManager.activeAircraft;
+    
+    const mainMenu = this.engine.moduleManager.get('MainMenu');
+    const mainMenuOpen = mainMenu ? mainMenu.isOpen : false;
+
+    // Reset continuous controls for evaluation
     aircraft.controls.pitch = 0;
     aircraft.controls.roll = 0;
     aircraft.controls.yaw = 0;
 
-    const mainMenu = this.engine.moduleManager.get('MainMenu');
-    const mainMenuOpen = mainMenu ? mainMenu.isOpen : false;
+    // Check for hardware module state data
+    const hardwareManager = this.engine.moduleManager.get('Hardware');
+    const hwState = hardwareManager ? hardwareManager.unifiedState : null;
 
-    if (mainMenuOpen || (this.menuManager && this.menuManager.isOpen) || aircraft.isCrashed) {
+    if (mainMenuOpen || (this.menuManager && this.menuManager.isOpen)) {
+      // Toggle menu close from controller menu button if visible
+      if (hwState && hwState.pauseToggle && this.menuManager && this.menuManager.isOpen) {
+        this.menuManager.closeMenu();
+      }
       return;
     }
 
-    if (this.keys['KeyW'] || this.keys['ArrowUp']) {
-      aircraft.controls.pitch = -1.0;
+    if (aircraft.isCrashed) {
+      // Allow respawn via controller button (A Button)
+      if (hwState && hwState.respawn) {
+        this.respawnAircraft(aircraft);
+      }
+      return;
     }
-    if (this.keys['KeyS'] || this.keys['ArrowDown']) {
-      aircraft.controls.pitch = 1.0;
+
+    // 1. Process Keyboard Continuous Axes States
+    let kbPitch = 0.0;
+    let kbRoll = 0.0;
+    let kbYaw = 0.0;
+    let kbThrottleDelta = 0.0;
+
+    if (this.keys['KeyW'] || this.keys['ArrowUp']) kbPitch = -1.0;
+    if (this.keys['KeyS'] || this.keys['ArrowDown']) kbPitch = 1.0;
+    if (this.keys['KeyA'] || this.keys['ArrowLeft']) kbRoll = -1.0;
+    if (this.keys['KeyD'] || this.keys['ArrowRight']) kbRoll = 1.0;
+    if (this.keys['KeyQ']) kbYaw = -1.0;
+    if (this.keys['KeyE']) kbYaw = 1.0;
+
+    if (aircraft.engineOn && aircraft.engineSpool > 0.8) {
+      if (this.keys['ShiftLeft'] || this.keys['Space']) kbThrottleDelta = 1.0;
+      if (this.keys['ControlLeft'] || this.keys['KeyX']) kbThrottleDelta = -1.0;
     }
-    if (this.keys['KeyA'] || this.keys['ArrowLeft']) {
-      aircraft.controls.roll = -1.0;
+
+    // 2. Process Hardware Analog Axes and Single-Pulse States
+    let hwPitch = 0.0;
+    let hwRoll = 0.0;
+    let hwYaw = 0.0;
+    let hwThrottleDelta = 0.0;
+
+    if (hwState) {
+      hwPitch = hwState.pitch;
+      hwRoll = hwState.roll;
+      hwYaw = hwState.yaw;
+      hwThrottleDelta = hwState.throttleDelta;
+
+      // Map discrete input toggles
+      if (hwState.gearToggle) {
+        aircraft.gearRetracted = !aircraft.gearRetracted;
+        console.log(`[InputManager] Gear Retracted toggled via hardware: ${aircraft.gearRetracted}`);
+      }
+      if (hwState.flapsDown) {
+        aircraft.flapsStage = Math.min(aircraft.flapsStage + 1, 2);
+        console.log(`[InputManager] Flaps Extended: ${aircraft.flapsStage}`);
+      }
+      if (hwState.flapsUp) {
+        aircraft.flapsStage = Math.max(aircraft.flapsStage - 1, 0);
+        console.log(`[InputManager] Flaps Retracted: ${aircraft.flapsStage}`);
+      }
+      if (hwState.airbrakeToggle) {
+        aircraft.airbrakesActive = !aircraft.airbrakesActive;
+        console.log(`[InputManager] Airbrakes toggled: ${aircraft.airbrakesActive}`);
+      }
+      if (hwState.wheelBrakesToggle) {
+        aircraft.controls.brakes = !aircraft.controls.brakes;
+        console.log(`[InputManager] Wheel Brakes toggled: ${aircraft.controls.brakes}`);
+      }
+      if (hwState.pauseToggle && this.menuManager) {
+        this.menuManager.openMenu();
+        console.log(`[InputManager] Simulation paused via hardware input.`);
+      }
     }
-    if (this.keys['KeyD'] || this.keys['ArrowRight']) {
-      aircraft.controls.roll = 1.0;
-    }
-    if (this.keys['KeyQ']) {
-      aircraft.controls.yaw = -1.0;
-    }
-    if (this.keys['KeyE']) {
-      aircraft.controls.yaw = 1.0;
+
+    // 3. Coordinate Inputs (prioritizing active hardware over keyboard)
+    aircraft.controls.pitch = Math.abs(hwPitch) > 0.05 ? hwPitch : kbPitch;
+    aircraft.controls.roll = Math.abs(hwRoll) > 0.05 ? hwRoll : kbRoll;
+    aircraft.controls.yaw = Math.abs(hwYaw) > 0.05 ? hwYaw : kbYaw;
+
+    let targetThrottleDelta = kbThrottleDelta;
+    if (Math.abs(hwThrottleDelta) > 0.05) {
+      targetThrottleDelta = hwThrottleDelta;
     }
 
     const isJet = aircraft.config.isJet ?? ['fighter', 'f16', 'f22', 'f35', 'b2'].includes(aircraft.config.id);
-    // Only aircraft with an afterburner have the extra throttle detent past 100%.
     const hasAfterburner = aircraft.config.hasAfterburner ?? isJet;
 
     if (aircraft.engineOn && aircraft.engineSpool > 0.8) {
       const throttleRate = 1.5 * deltaTime;
-      if (this.keys['ShiftLeft'] || this.keys['Space']) {
-        const maxThrottle = hasAfterburner ? 1.2 : 1.0;
-        aircraft.controls.throttle = Math.min(aircraft.controls.throttle + throttleRate, maxThrottle);
-      }
-      if (this.keys['ControlLeft'] || this.keys['KeyX']) {
-        aircraft.controls.throttle = Math.max(aircraft.controls.throttle - throttleRate, 0.0);
-      }
+      const maxThrottle = hasAfterburner ? 1.2 : 1.0;
+      aircraft.controls.throttle = Math.min(
+        Math.max(aircraft.controls.throttle + targetThrottleDelta * throttleRate, 0.0),
+        maxThrottle
+      );
+
       if (hasAfterburner && aircraft.controls.throttle > 1.01) {
         aircraft.afterburnerActive = true;
       } else {

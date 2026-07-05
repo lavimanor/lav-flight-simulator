@@ -13,6 +13,7 @@ import { WeatherManager } from './modules/WeatherManager.js';
 import { SoundManager } from './modules/SoundManager.js';
 import { SettingsMenu } from './modules/ui/SettingsMenu.js';
 import { DebugManager } from './modules/ui/DebugManager.js';
+import { HardwareManager } from './modules/HardwareManager.js'; // Added Hardware Manager
 
 document.addEventListener('DOMContentLoaded', () => {
   try {
@@ -25,6 +26,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const weatherManager = new WeatherManager();
     moduleManager.register('Weather', weatherManager);
+
+    const hardwareManager = new HardwareManager(); // Added Hardware Manager
+    moduleManager.register('Hardware', hardwareManager);
     
     const inputManager = new InputManager();
     moduleManager.register('Input', inputManager);
