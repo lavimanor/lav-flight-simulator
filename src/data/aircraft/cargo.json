@@ -18,7 +18,8 @@
   "engineType": "Quad Turboprop",
   "terminalSpeed": 90.0,
   "stallSpeed": 18.0,
-  "pitchGScale": 2.0,
+  "pitchGScale": 2.5,
+  "dihedral": 1.3,
   "dimensions": { "span": 40.4, "length": 29.8, "height": 11.6 },
   "camera": {
     "offsetX": 0.0,

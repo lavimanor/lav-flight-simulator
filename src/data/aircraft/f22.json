@@ -18,7 +18,8 @@
   "engineType": "Twin Vectoring",
   "terminalSpeed": 200.0,
   "stallSpeed": 28.0,
-  "pitchGScale": 7.5,
+  "pitchGScale": 9.0,
+  "dihedral": 0.85,
   "dimensions": { "span": 13.56, "length": 18.9, "height": 5.08 },
   "camera": {
     "offsetX": 0.0,

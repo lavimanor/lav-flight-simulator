@@ -109,17 +109,19 @@ export class InputManager {
     }
 
     const isJet = aircraft.config.isJet ?? ['fighter', 'f16', 'f22', 'f35', 'b2'].includes(aircraft.config.id);
+    // Only aircraft with an afterburner have the extra throttle detent past 100%.
+    const hasAfterburner = aircraft.config.hasAfterburner ?? isJet;
 
     if (aircraft.engineOn && aircraft.engineSpool > 0.8) {
       const throttleRate = 1.5 * deltaTime;
       if (this.keys['ShiftLeft'] || this.keys['Space']) {
-        const maxThrottle = isJet ? 1.2 : 1.0;
+        const maxThrottle = hasAfterburner ? 1.2 : 1.0;
         aircraft.controls.throttle = Math.min(aircraft.controls.throttle + throttleRate, maxThrottle);
       }
       if (this.keys['ControlLeft'] || this.keys['KeyX']) {
         aircraft.controls.throttle = Math.max(aircraft.controls.throttle - throttleRate, 0.0);
       }
-      if (isJet && aircraft.controls.throttle > 1.01) {
+      if (hasAfterburner && aircraft.controls.throttle > 1.01) {
         aircraft.afterburnerActive = true;
       } else {
         aircraft.afterburnerActive = false;

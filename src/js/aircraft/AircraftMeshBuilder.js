@@ -163,6 +163,32 @@ export class AircraftMeshBuilder {
     const rightWheel = new THREE.Mesh(tireGeo, tireMat);
     rightWheel.position.set(1.2, -1.2, -0.2);
     aircraft.gearGroup.add(rightWheel);
+
+    // Dorsal fin fillet ahead of the rudder.
+    const filletGeo = new THREE.BoxGeometry(0.06, 0.5, 1.0);
+    filletGeo.translate(0, 0.25, 0);
+    const fillet = new THREE.Mesh(filletGeo, trimMat);
+    fillet.position.set(0, 0.3, -2.0);
+    aircraft.group.add(fillet);
+
+    // Wheel spats (fairings) on the main gear.
+    const spatGeo = new THREE.SphereGeometry(0.4, 10, 8);
+    spatGeo.scale(1, 1, 1.6);
+    [-1.2, 1.2].forEach((x) => {
+      const spat = new THREE.Mesh(spatGeo, fuselageMat);
+      spat.position.set(x, -1.15, -0.2);
+      aircraft.gearGroup.add(spat);
+    });
+
+    // Wingtip nav lights: red on the port (+X) tip, green on starboard (-X).
+    const navGeo = new THREE.SphereGeometry(0.12, 8, 8);
+    const redNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0xff2222 }));
+    redNav.position.set(aircraft.config.dimensions.span / 2, 0.35, 0.6);
+    aircraft.group.add(redNav);
+    const greenNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0x22ff22 }));
+    greenNav.position.set(-aircraft.config.dimensions.span / 2, 0.35, 0.6);
+    aircraft.group.add(greenNav);
+
     this.configureShadows(aircraft.group);
   }
   static buildFighter(aircraft) {
@@ -262,6 +288,37 @@ export class AircraftMeshBuilder {
     const rightFlame = new THREE.Mesh(flameGeo, flameMat);
     rightFlame.position.set(0.25, 0, -4.5);
     aircraft.afterburnerGroup.add(rightFlame);
+
+    // Large leading-edge extensions (LEX) — the Hornet's signature.
+    const lexGeo = new THREE.BoxGeometry(0.65, 0.05, 2.6);
+    const leftLex = new THREE.Mesh(lexGeo, fuselageMat);
+    leftLex.position.set(-0.5, 0.06, 1.3);
+    leftLex.rotation.y = 0.36;
+    aircraft.group.add(leftLex);
+    const rightLex = new THREE.Mesh(lexGeo, fuselageMat);
+    rightLex.position.set(0.5, 0.06, 1.3);
+    rightLex.rotation.y = -0.36;
+    aircraft.group.add(rightLex);
+
+    // Twin side intakes.
+    const intakeGeo = new THREE.BoxGeometry(0.5, 0.5, 2.0);
+    const leftIntake = new THREE.Mesh(intakeGeo, trimMat);
+    leftIntake.position.set(-0.5, -0.25, 1.4);
+    aircraft.group.add(leftIntake);
+    const rightIntake = new THREE.Mesh(intakeGeo, trimMat);
+    rightIntake.position.set(0.5, -0.25, 1.4);
+    aircraft.group.add(rightIntake);
+
+    // Wingtip missile rails.
+    const railGeo = new THREE.CylinderGeometry(0.08, 0.06, 1.7, 6);
+    railGeo.rotateX(Math.PI / 2);
+    const railMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.5 });
+    [-4.6, 4.6].forEach((x) => {
+      const rail = new THREE.Mesh(railGeo, railMat);
+      rail.position.set(x, 0, -1.9);
+      aircraft.group.add(rail);
+    });
+
     this.configureShadows(aircraft.group);
   }
   static buildStunt(aircraft) {
@@ -333,6 +390,29 @@ export class AircraftMeshBuilder {
     const rightWheel = new THREE.Mesh(tireGeo, tireMat);
     rightWheel.position.set(0.75, -0.9, 1.2);
     aircraft.gearGroup.add(rightWheel);
+
+    // Interplane N-struts and cabane struts tying the biplane wings together.
+    const diagStrutGeo = new THREE.CylinderGeometry(0.025, 0.025, 1.25, 6);
+    [-1.4, 1.4].forEach((x) => {
+      const s = new THREE.Mesh(diagStrutGeo, trimMat);
+      s.position.set(x, 0.25, 0.5);
+      s.rotation.x = 0.2;
+      aircraft.group.add(s);
+    });
+    const cabaneGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.85, 6);
+    [-0.35, 0.35].forEach((x) => {
+      const c = new THREE.Mesh(cabaneGeo, trimMat);
+      c.position.set(x, 0.45, 0.6);
+      aircraft.group.add(c);
+    });
+
+    // Tail skid.
+    const skidGeo = new THREE.BoxGeometry(0.05, 0.4, 0.5);
+    skidGeo.translate(0, -0.2, 0);
+    const skid = new THREE.Mesh(skidGeo, metalMat);
+    skid.position.set(0, -0.3, -1.9);
+    aircraft.group.add(skid);
+
     this.configureShadows(aircraft.group);
   }
   static buildCargo(aircraft) {
@@ -406,35 +486,112 @@ export class AircraftMeshBuilder {
     const rightWheel = new THREE.Mesh(tireGeo, tireMat);
     rightWheel.position.set(1.5, -1.7, -0.6);
     aircraft.gearGroup.add(rightWheel);
+
+    // Upswept rear cargo ramp under the tail.
+    const rampGeo = new THREE.BoxGeometry(2.2, 0.15, 2.6);
+    const ramp = new THREE.Mesh(rampGeo, fuselageMat);
+    ramp.position.set(0, -0.4, -4.6);
+    ramp.rotation.x = -0.35;
+    aircraft.group.add(ramp);
+
+    // Wingtip nav lights: red on the port (+X) tip, green on starboard (-X).
+    const navGeo = new THREE.SphereGeometry(0.2, 8, 8);
+    const redNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0xff2222 }));
+    redNav.position.set(8.0, 1.1, 0.2);
+    aircraft.group.add(redNav);
+    const greenNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0x22ff22 }));
+    greenNav.position.set(-8.0, 1.1, 0.2);
+    aircraft.group.add(greenNav);
+
     this.configureShadows(aircraft.group);
   }
   static buildB2(aircraft) {
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x263238, roughness: 0.6 });
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0x11161b, roughness: 0.1, metalness: 0.9 });
-    const exhaustMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
-    const bodyGeo = new THREE.BoxGeometry(2.4, 0.6, 6.0);
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2b2f33, roughness: 0.55, metalness: 0.2 });
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0x24282c, roughness: 0.6, metalness: 0.15 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x0d1116, roughness: 0.1, metalness: 0.9 });
+    const exhaustMat = new THREE.MeshStandardMaterial({ color: 0x0e0e0e, roughness: 0.85 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x6b7075, roughness: 0.3, metalness: 0.8 });
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x0d0d0d, roughness: 0.9 });
+
+    const halfSpan = 16.0;
+
+    // --- Swept wings that form the main delta planform ---
+    const makeWing = (sign) => {
+      const geo = new THREE.BoxGeometry(halfSpan, 0.28, 5.5);
+      geo.translate(sign * halfSpan / 2, 0, 0);   // inboard edge at centreline
+      const wing = new THREE.Mesh(geo, wingMat);
+      wing.position.set(0, 0, -0.4);
+      wing.rotation.y = sign * 0.62;              // ~35deg leading-edge sweep
+      aircraft.group.add(wing);
+    };
+    makeWing(-1);
+    makeWing(1);
+
+    // Raised blended centre spine over the wing roots.
+    const body = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.9, 7.5), bodyMat);
+    body.position.set(0, 0.25, 0.2);
     aircraft.group.add(body);
-    const leftWingGeo = new THREE.BoxGeometry(18.0, 0.12, 4.0);
-    leftWingGeo.translate(-9.0, 0, 0);
-    const leftWing = new THREE.Mesh(leftWingGeo, bodyMat);
-    leftWing.position.set(-0.8, -0.1, -1.0);
-    leftWing.rotation.y = -0.65;
-    aircraft.group.add(leftWing);
-    const rightWingGeo = new THREE.BoxGeometry(18.0, 0.12, 4.0);
-    rightWingGeo.translate(9.0, 0, 0);
-    const rightWing = new THREE.Mesh(rightWingGeo, bodyMat);
-    rightWing.position.set(0.8, -0.1, -1.0);
-    rightWing.rotation.y = 0.65;
-    aircraft.group.add(rightWing);
-    const cockpitGeo = new THREE.BoxGeometry(1.6, 0.25, 0.8);
+
+    // Pointed nose chine (flattened 4-sided cone), same pattern as the F35 nose.
+    const noseGeo = new THREE.ConeGeometry(2.5, 4.6, 4);
+    noseGeo.rotateX(Math.PI / 2);
+    noseGeo.rotateZ(Math.PI / 4);
+    noseGeo.scale(1, 0.3, 1);
+    const nose = new THREE.Mesh(noseGeo, bodyMat);
+    nose.position.set(0, 0.12, 4.2);
+    aircraft.group.add(nose);
+
+    // Central beavertail point at the trailing edge (flat triangle pointing aft).
+    const tailGeo = new THREE.ConeGeometry(1.5, 3.2, 4);
+    tailGeo.rotateX(-Math.PI / 2);
+    tailGeo.rotateZ(Math.PI / 4);
+    tailGeo.scale(1, 0.15, 1);
+    const beaverTail = new THREE.Mesh(tailGeo, wingMat);
+    beaverTail.position.set(0, 0.02, -3.2);
+    aircraft.group.add(beaverTail);
+
+    // Cockpit blister.
+    const cockpitGeo = new THREE.SphereGeometry(0.9, 16, 12);
+    cockpitGeo.scale(1.0, 0.5, 1.7);
     const cockpit = new THREE.Mesh(cockpitGeo, glassMat);
-    cockpit.position.set(0, 0.25, 1.8);
+    cockpit.position.set(0, 0.62, 2.6);
     aircraft.group.add(cockpit);
-    const nozzleGeo = new THREE.BoxGeometry(1.2, 0.15, 0.8);
-    const nozzle = new THREE.Mesh(nozzleGeo, exhaustMat);
-    nozzle.position.set(0, -0.1, -2.8);
-    aircraft.group.add(nozzle);
+
+    // Engine intake humps and exhaust troughs (4 buried engines, top-mounted).
+    const intakeGeo = new THREE.BoxGeometry(1.3, 0.42, 2.0);
+    const exhGeo = new THREE.BoxGeometry(1.1, 0.18, 1.3);
+    [-2.2, -0.85, 0.85, 2.2].forEach((x) => {
+      const intake = new THREE.Mesh(intakeGeo, bodyMat);
+      intake.position.set(x, 0.55, 0.7);
+      aircraft.group.add(intake);
+      const exh = new THREE.Mesh(exhGeo, exhaustMat);
+      exh.position.set(x, 0.22, -2.5);
+      aircraft.group.add(exh);
+    });
+
+    // --- Retractable landing gear: nose + two multi-wheel mains ---
+    const strutGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.4, 8);
+    const tireGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.4, 14);
+    tireGeo.rotateZ(Math.PI / 2);
+
+    const noseStrut = new THREE.Mesh(strutGeo, metalMat);
+    noseStrut.position.set(0, -0.75, 3.4);
+    aircraft.gearGroup.add(noseStrut);
+    const noseWheel = new THREE.Mesh(tireGeo, tireMat);
+    noseWheel.position.set(0, -1.35, 3.4);
+    aircraft.gearGroup.add(noseWheel);
+
+    [-1.8, 1.8].forEach((x) => {
+      const strut = new THREE.Mesh(strutGeo, metalMat);
+      strut.position.set(x, -0.75, -0.6);
+      aircraft.gearGroup.add(strut);
+      [-0.5, 0.5].forEach((dz) => {
+        const wheel = new THREE.Mesh(tireGeo, tireMat);
+        wheel.position.set(x, -1.35, -0.6 + dz);
+        aircraft.gearGroup.add(wheel);
+      });
+    });
+
     this.configureShadows(aircraft.group);
   }
   static buildF16(aircraft) {
@@ -517,6 +674,47 @@ export class AircraftMeshBuilder {
     const flame = new THREE.Mesh(flameGeo, flameMat);
     flame.position.set(0, 0, -4.3);
     aircraft.afterburnerGroup.add(flame);
+
+    // Distinctive chin intake lip under the nose.
+    const intakeLipGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.55, 12);
+    intakeLipGeo.rotateX(Math.PI / 2);
+    const intakeLip = new THREE.Mesh(intakeLipGeo, exhaustMat);
+    intakeLip.position.set(0, -0.52, 3.1);
+    aircraft.group.add(intakeLip);
+
+    // LERX strakes blending the nose into the wing roots.
+    const strakeGeo = new THREE.BoxGeometry(0.55, 0.05, 2.4);
+    const leftStrake = new THREE.Mesh(strakeGeo, bodyMat);
+    leftStrake.position.set(-0.45, 0.03, 1.7);
+    leftStrake.rotation.y = 0.32;
+    aircraft.group.add(leftStrake);
+    const rightStrake = new THREE.Mesh(strakeGeo, bodyMat);
+    rightStrake.position.set(0.45, 0.03, 1.7);
+    rightStrake.rotation.y = -0.32;
+    aircraft.group.add(rightStrake);
+
+    // Ventral fins under the tail.
+    const ventralGeo = new THREE.BoxGeometry(0.05, 0.55, 0.9);
+    ventralGeo.translate(0, -0.27, 0);
+    const leftVentral = new THREE.Mesh(ventralGeo, trimMat);
+    leftVentral.position.set(-0.4, -0.35, -3.0);
+    leftVentral.rotation.z = 0.45;
+    aircraft.group.add(leftVentral);
+    const rightVentral = new THREE.Mesh(ventralGeo, trimMat);
+    rightVentral.position.set(0.4, -0.35, -3.0);
+    rightVentral.rotation.z = -0.45;
+    aircraft.group.add(rightVentral);
+
+    // Wingtip missile rails.
+    const railGeo = new THREE.CylinderGeometry(0.07, 0.05, 1.6, 6);
+    railGeo.rotateX(Math.PI / 2);
+    const railMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.5 });
+    [-3.9, 3.9].forEach((x) => {
+      const rail = new THREE.Mesh(railGeo, railMat);
+      rail.position.set(x, 0.05, -1.2);
+      aircraft.group.add(rail);
+    });
+
     this.configureShadows(aircraft.group);
   }
   static buildF35(aircraft) {
@@ -604,6 +802,33 @@ export class AircraftMeshBuilder {
     const flame = new THREE.Mesh(flameGeo, flameMat);
     flame.position.set(0, 0, -4.1);
     aircraft.afterburnerGroup.add(flame);
+
+    // DSI (diverterless) intake bumps on the fuselage sides.
+    const bumpGeo = new THREE.SphereGeometry(0.42, 12, 10);
+    bumpGeo.scale(1.0, 0.85, 1.5);
+    const leftBump = new THREE.Mesh(bumpGeo, bodyMat);
+    leftBump.position.set(-0.58, -0.12, 2.0);
+    aircraft.group.add(leftBump);
+    const rightBump = new THREE.Mesh(bumpGeo, bodyMat);
+    rightBump.position.set(0.58, -0.12, 2.0);
+    aircraft.group.add(rightBump);
+
+    // Weapons-bay belly bulge (the F-35's characteristically deep fuselage).
+    const belly = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.45, 4.2), bodyMat);
+    belly.position.set(0, -0.42, 0.4);
+    aircraft.group.add(belly);
+
+    // Leading-edge root chines.
+    const chineGeo = new THREE.BoxGeometry(0.9, 0.06, 2.8);
+    const leftChine = new THREE.Mesh(chineGeo, bodyMat);
+    leftChine.position.set(-0.68, 0.05, 2.0);
+    leftChine.rotation.y = 0.26;
+    aircraft.group.add(leftChine);
+    const rightChine = new THREE.Mesh(chineGeo, bodyMat);
+    rightChine.position.set(0.68, 0.05, 2.0);
+    rightChine.rotation.y = -0.26;
+    aircraft.group.add(rightChine);
+
     this.configureShadows(aircraft.group);
   }
   static buildF22(aircraft) {
@@ -696,6 +921,34 @@ export class AircraftMeshBuilder {
     const rightFlame = new THREE.Mesh(flameGeo, flameMat);
     rightFlame.position.set(0.25, 0, -4.3);
     aircraft.afterburnerGroup.add(rightFlame);
+
+    // Caret engine intakes under the wing roots.
+    const intakeGeo = new THREE.BoxGeometry(0.55, 0.5, 2.4);
+    const leftIntake = new THREE.Mesh(intakeGeo, trimMat);
+    leftIntake.position.set(-0.62, -0.22, 1.9);
+    leftIntake.rotation.y = 0.09;
+    aircraft.group.add(leftIntake);
+    const rightIntake = new THREE.Mesh(intakeGeo, trimMat);
+    rightIntake.position.set(0.62, -0.22, 1.9);
+    rightIntake.rotation.y = -0.09;
+    aircraft.group.add(rightIntake);
+
+    // Leading-edge root extensions (chines) blending the nose into the wings.
+    const lerxGeo = new THREE.BoxGeometry(1.0, 0.06, 3.2);
+    const leftLerx = new THREE.Mesh(lerxGeo, bodyMat);
+    leftLerx.position.set(-0.75, 0.06, 2.1);
+    leftLerx.rotation.y = 0.28;
+    aircraft.group.add(leftLerx);
+    const rightLerx = new THREE.Mesh(lerxGeo, bodyMat);
+    rightLerx.position.set(0.75, 0.06, 2.1);
+    rightLerx.rotation.y = -0.28;
+    aircraft.group.add(rightLerx);
+
+    // Dorsal spine.
+    const spine = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 4.0), bodyMat);
+    spine.position.set(0, 0.32, -0.6);
+    aircraft.group.add(spine);
+
     this.configureShadows(aircraft.group);
   }
   static configureShadows(group) {

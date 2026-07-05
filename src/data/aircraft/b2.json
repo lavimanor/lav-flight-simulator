@@ -18,7 +18,8 @@
   "engineType": "Quad Turbofan",
   "terminalSpeed": 135.0,
   "stallSpeed": 22.0,
-  "pitchGScale": 3.0,
+  "pitchGScale": 2.5,
+  "dihedral": 1.4,
   "dimensions": { "span": 52.4, "length": 21.0, "height": 5.1 },
   "groundClearanceOffset": 1.35,
   "camera": {

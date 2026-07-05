@@ -18,7 +18,8 @@
   "engineType": "Radial Piston",
   "terminalSpeed": 70.0,
   "stallSpeed": 12.0,
-  "pitchGScale": 3.5,
+  "pitchGScale": 7.0,
+  "dihedral": 0.7,
   "dimensions": { "span": 6.2, "length": 5.8, "height": 2.1 },
   "camera": {
     "offsetX": 0.0,

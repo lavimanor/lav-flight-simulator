@@ -18,7 +18,8 @@
   "engineType": "Single Turbofan",
   "terminalSpeed": 185.0,
   "stallSpeed": 28.0,
-  "pitchGScale": 7.0,
+  "pitchGScale": 9.0,
+  "dihedral": 0.8,
   "dimensions": { "span": 9.96, "length": 15.03, "height": 4.88 },
   "camera": {
     "offsetX": 0.0,

@@ -18,7 +18,8 @@
   "engineType": "Single Piston",
   "terminalSpeed": 55.0,
   "stallSpeed": 13.5,
-  "pitchGScale": 2.5,
+  "pitchGScale": 4.0,
+  "dihedral": 1.2,
   "dimensions": { "span": 11.0, "length": 8.2, "height": 2.4 },
   "camera": {
     "offsetX": 0.0,

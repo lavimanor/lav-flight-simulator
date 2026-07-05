@@ -41,6 +41,9 @@ export class FlightPhysicsSolver {
     yawResponse: 3.5,     // rudder responds slowest
     pitchStability: 1.5,  // rad/s of nose-down per rad of AoA above trim
     yawStability: 1.5,    // rad/s of weathervane per rad of sideslip (coordinates turns)
+    dihedral: 0.5,        // rad/s of leveling roll per rad of sideslip (lateral stability)
+    rollDueToYaw: 0.6,    // rudder's secondary roll: rudder input banks into the yaw
+    adverseYaw: 0.12,     // yaw opposite the roll command (needs rudder to coordinate)
     aoaTrim: 0.06         // built-in trim angle of attack (~3.5deg) so hands-off flight sustains lift
   };
 
@@ -195,13 +198,36 @@ export class FlightPhysicsSolver {
       if (aircraft.position.y < restY) aircraft.position.y = restY;
       if (aircraft.velocity.y < 0) aircraft.velocity.y = 0;
 
-      // Rolling / braking / belly friction opposes horizontal motion.
+      // Ground friction is directional. Rolling/braking friction opposes motion
+      // ALONG the heading, while the tires resist sideways skidding much more
+      // strongly (cornering grip) so nosewheel steering actually curves the
+      // taxi/takeoff path instead of the aircraft sliding like it's on ice.
       const horizSpeed = Math.hypot(aircraft.velocity.x, aircraft.velocity.z);
       if (horizSpeed > 1e-4) {
-        const decel = BrakeSolver.solve(aircraft, true, dt);
-        const scale = Math.max(horizSpeed - decel * dt, 0.0) / horizSpeed;
-        aircraft.velocity.x *= scale;
-        aircraft.velocity.z *= scale;
+        const fwdH = new THREE.Vector3(forward.x, 0, forward.z);
+        if (fwdH.lengthSq() > 1e-6) {
+          fwdH.normalize();
+          const vHoriz = new THREE.Vector3(aircraft.velocity.x, 0, aircraft.velocity.z);
+          const vFwd = vHoriz.dot(fwdH);
+          const vLat = vHoriz.clone().addScaledVector(fwdH, -vFwd); // sideways skid
+
+          // Along-track: rolling resistance + wheel brakes (or belly drag).
+          const decel = BrakeSolver.solve(aircraft, true, dt);
+          const newVFwd = Math.sign(vFwd) * Math.max(Math.abs(vFwd) - decel * dt, 0.0);
+
+          // Cross-track: bleed the skid off quickly on wheels, slowly on the belly.
+          const lateralGripPerSec = aircraft.gearRetracted ? 1.5 : 7.0;
+          vLat.multiplyScalar(Math.max(1.0 - lateralGripPerSec * dt, 0.0));
+
+          const newHoriz = fwdH.multiplyScalar(newVFwd).add(vLat);
+          aircraft.velocity.x = newHoriz.x;
+          aircraft.velocity.z = newHoriz.z;
+        } else {
+          const decel = BrakeSolver.solve(aircraft, true, dt);
+          const scale = Math.max(horizSpeed - decel * dt, 0.0) / horizSpeed;
+          aircraft.velocity.x *= scale;
+          aircraft.velocity.z *= scale;
+        }
       }
       aircraft.isBellyScraping = aircraft.gearRetracted;
     } else {
@@ -314,9 +340,26 @@ export class FlightPhysicsSolver {
     // Static stability, expressed as restoring rates:
     // - pitch: spring toward the trim AoA (gives hands-off lift and stick-free recovery)
     // - yaw: weathervane into the relative wind (coordinates banked turns)
+    // - roll (dihedral): a sideslip rolls the aircraft back toward wings-level
+    // sideslipRad > 0 means the nose points right of the velocity vector; the
+    // aircraft then needs to yaw left (+Y) and roll left (-Z) to recover.
     const stabScale = THREE.MathUtils.clamp(V / 30.0, 0.0, 1.5) * stallFactor;
-    pitchRateTarget += T.pitchStability * (aoaRad - T.aoaTrim) * stabScale; // AoA above trim -> nose down (+X)
-    yawRateTarget += T.yawStability * sideslipRad * stabScale;             // yaw toward the airflow (+Y = toward +X)
+    const dihedralGain = config.dihedral ?? 1.0; // per-type (flying wings & high-wings are stiffer)
+    pitchRateTarget += T.pitchStability * (aoaRad - T.aoaTrim) * stabScale;       // AoA above trim -> nose down (+X)
+    yawRateTarget += T.yawStability * sideslipRad * stabScale;                    // yaw toward the airflow (+Y = toward +X)
+    rollRateTarget += -T.dihedral * dihedralGain * sideslipRad * stabScale;       // lateral stability -> level the wings
+
+    // Rudder's secondary roll effect: applying rudder yaws the aircraft and the
+    // advancing (outer) wing makes more lift, banking it INTO the yaw. This is
+    // tied to the rudder INPUT rather than the yaw rate, so a coordinated aileron
+    // turn (no rudder) doesn't get a destabilizing roll->yaw->roll feedback loop.
+    // Rudder-right is yawCmd +1, which should bank right (+Z).
+    rollRateTarget += T.rollDueToYaw * yawCmd * config.yawRate * pitchYawAuthority;
+
+    // Adverse yaw: deflecting the ailerons drags the rising wing back, swinging
+    // the nose opposite to the roll. Props show it more than jets with spoilers.
+    const adverseGain = isJet ? 0.5 : 1.0;
+    yawRateTarget += T.adverseYaw * adverseGain * rollCmd * config.rollRate * authority; // roll right (+) -> yaw left (+Y)
 
     // Tail-strike protection: near the ground, the commanded nose-up rate fades
     // to zero as pitch approaches the attitude at which the tail would touch

@@ -18,7 +18,8 @@
   "engineType": "Twin Turbofan",
   "terminalSpeed": 180.0,
   "stallSpeed": 28.0,
-  "pitchGScale": 6.5,
+  "pitchGScale": 7.5,
+  "dihedral": 0.8,
   "dimensions": { "span": 11.4, "length": 17.1, "height": 4.7 },
   "camera": {
     "offsetX": 0.0,
