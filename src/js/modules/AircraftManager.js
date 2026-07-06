@@ -97,8 +97,12 @@ export class AircraftManager {
   }
 
   update(deltaTime) {
-    if (this.activeAircraft) {
-      this.activeAircraft.update(deltaTime);
-    }
+    if (!this.activeAircraft) return;
+    // Freeze the simulation while the hangar or settings modals are up so the
+    // aircraft doesn't fly itself into terrain behind the menu.
+    const menu = this.engine?.moduleManager?.get('Menu');
+    const settings = this.engine?.moduleManager?.get('Settings');
+    if ((menu && menu.isOpen) || (settings && settings.isOpen)) return;
+    this.activeAircraft.update(deltaTime);
   }
 }

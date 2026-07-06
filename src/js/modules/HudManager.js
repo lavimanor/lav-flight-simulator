@@ -80,7 +80,10 @@ export class HudManager {
     this.airbrakesWarning = document.getElementById('hud-airbrakes-warning');
     this.abWarning = document.getElementById('hud-ab-warning');
 
+    this.trimVal = document.getElementById('hud-trim-val');
+
     this.generateProceduralPitchLadder();
+    this.generateHeadingTape();
 
     // Initialize decoupled HUD components
     this.fpvComponent = new FlightPathVector();
@@ -88,6 +91,29 @@ export class HudManager {
 
     this.ilsComponent = new ILSIndicator();
     this.ilsComponent.init();
+  }
+
+  // Labeled compass tape: ticks every 10 degrees with cardinal letters and
+  // two-digit labels every 30. The tape spans -120..480 degrees so the visible
+  // 120-degree window is always populated, including across the 360/0 wrap.
+  generateHeadingTape() {
+    if (!this.headingTape) return;
+    this.headingTape.innerHTML = '';
+    const pxPerDeg = 2;
+    for (let deg = -120; deg <= 480; deg += 10) {
+      const tick = document.createElement('div');
+      const norm = ((deg % 360) + 360) % 360;
+      const isMajor = norm % 30 === 0;
+      tick.className = `hdg-tick${isMajor ? ' major' : ''}`;
+      tick.style.left = `${(deg + 120) * pxPerDeg}px`;
+      if (isMajor) {
+        const label = document.createElement('span');
+        const cardinals = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' };
+        label.textContent = cardinals[norm] ?? String(norm / 10).padStart(2, '0');
+        tick.appendChild(label);
+      }
+      this.headingTape.appendChild(tick);
+    }
   }
 
   generateProceduralPitchLadder() {
@@ -203,16 +229,24 @@ export class HudManager {
           this.pitchLadder.style.transform = `translateY(${pitchOffsetPx}px) rotate(${-cameraRollDeg}deg)`;
         }
 
-        // Update top Heading tape tick displacement
+        // Scroll the compass tape so the current heading sits under the ticker.
+        // Tick for heading h is at (h+120)*2 px; the view is 240 px wide, so
+        // centering it means translating by 120 - (h+120)*2 = -(120 + 2h).
         if (this.headingTape) {
-          const tapeOffsetPx = -aircraft.heading * 2; 
-          this.headingTape.style.transform = `translateX(${tapeOffsetPx}px)`;
+          this.headingTape.style.transform = `translateX(${-(120 + aircraft.heading * 2)}px)`;
         }
 
         // Advanced Systems Telemetry HUD integration
         if (this.fuelVal) {
           this.fuelVal.textContent = `${Math.round(aircraft.fuel)} kg`;
           this.fuelVal.style.color = aircraft.fuel < (aircraft.config.maxFuelCapacity * 0.15) ? '#ff5555' : '#00ff66';
+        }
+
+        if (this.trimVal) {
+          const trim = aircraft.controls.pitchTrim || 0;
+          const pct = Math.round(Math.abs(trim) * 100);
+          this.trimVal.textContent = pct === 0 ? 'NEUTRAL' : `${pct}% ${trim > 0 ? 'UP' : 'DN'}`;
+          this.trimVal.style.color = Math.abs(trim) > 0.35 ? '#ffea00' : '#00ff66';
         }
 
         if (this.gForceVal) {

@@ -11,7 +11,10 @@ export class LiftSolver {
     const baseCL = Aerodynamics.getLiftCoefficient(aoaRad, config.liftCoefficientMax, mach);
 
     // High-lift flap surfaces add camber (extra CL) at the low-speed settings.
-    const flapsCLBonus = (aircraft.flapsStage === 1) ? 0.28 : (aircraft.flapsStage === 2 ? 0.55 : 0.0);
+    // flapEffectiveness (from the physics solver) folds the benefit away above
+    // the flap placard speed so overspeed flight can't keep landing-flap lift.
+    const flapsCLBonus = ((aircraft.flapsStage === 1) ? 0.28 : (aircraft.flapsStage === 2 ? 0.55 : 0.0))
+      * (aircraft.flapEffectiveness ?? 1.0);
 
     // CL without ground effect: this is what induced drag should be charged for
     // (ground effect reduces induced drag, so the GE boost must not inflate it).

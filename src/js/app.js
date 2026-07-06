@@ -14,6 +14,7 @@ import { SoundManager } from './modules/SoundManager.js';
 import { SettingsMenu } from './modules/ui/SettingsMenu.js';
 import { DebugManager } from './modules/ui/DebugManager.js';
 import { HardwareManager } from './modules/HardwareManager.js'; // Added Hardware Manager
+import { RingCourseManager } from './modules/RingCourseManager.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   try {
@@ -62,6 +63,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const debugManager = new DebugManager();
     moduleManager.register('Debug', debugManager);
+
+    // Registered as 'Obstacles' so FlightPhysicsSolver's collision hook sees it.
+    const ringCourseManager = new RingCourseManager();
+    moduleManager.register('Obstacles', ringCourseManager);
 
     moduleManager.initAll();
     engine.start();

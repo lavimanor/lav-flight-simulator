@@ -145,8 +145,17 @@ export class FlightPhysicsSolver {
       geLiftMultiplier = 1.0 + 0.20 * (span - heightAboveGround) / span;
     }
 
+    // Flap blowback: above the flap placard speed the airload folds the surfaces'
+    // extra lift/drag away, so landing flap at Mach 0.9 does nothing instead of
+    // granting full high-lift camber. Shared with the Lift/Drag solvers.
+    const flapPlacardIAS = config.flapPlacardIAS ?? 75.0; // m/s indicated (~145 kt)
+    const iasNow = V * Math.sqrt(densityRatio);
+    aircraft.flapEffectiveness = THREE.MathUtils.clamp(
+      (flapPlacardIAS * 1.3 - iasNow) / (flapPlacardIAS * 0.3), 0.0, 1.0);
+
     // Effective max lift coefficient (with flaps) sets the real stall/rotate speeds.
-    const flapsCLBonus = (aircraft.flapsStage === 1) ? 0.28 : (aircraft.flapsStage === 2 ? 0.55 : 0.0);
+    const flapsCLBonus = ((aircraft.flapsStage === 1) ? 0.28 : (aircraft.flapsStage === 2 ? 0.55 : 0.0))
+      * aircraft.flapEffectiveness;
     const effectiveCLmax = config.liftCoefficientMax + flapsCLBonus;
     const stallSpeed = Math.sqrt((2 * weightN) / (Math.max(airDensity, 0.2) * config.wingArea * effectiveCLmax));
     const rotateSpeed = 0.90 * stallSpeed; // begin raising the nose just below stall speed
@@ -324,7 +333,9 @@ export class FlightPhysicsSolver {
     aircraft.controls.rollSmoothed = THREE.MathUtils.lerp(aircraft.controls.rollSmoothed || 0, aircraft.controls.roll, 8.0 * dt);
     aircraft.controls.yawSmoothed = THREE.MathUtils.lerp(aircraft.controls.yawSmoothed || 0, aircraft.controls.yaw, 8.0 * dt);
 
-    const pitchCmd = aircraft.controls.pitchSmoothed; // +1 (S / Down) = nose up
+    // Pitch trim biases the stick so cruise can fly hands-off (End/Home keys).
+    const pitchTrim = aircraft.controls.pitchTrim || 0;
+    const pitchCmd = THREE.MathUtils.clamp(aircraft.controls.pitchSmoothed + pitchTrim, -1, 1); // +1 (S / Down) = nose up
     const rollCmd = aircraft.controls.rollSmoothed;   // +1 (D / Right) = bank right
     const yawCmd = aircraft.controls.yawSmoothed;     // +1 (E) = nose right
 
@@ -368,7 +379,7 @@ export class FlightPhysicsSolver {
     const dihedralGain = config.dihedral ?? 1.0; // per-type (flying wings & high-wings are stiffer)
     pitchRateTarget += T.pitchStability * (aoaRad - T.aoaTrim) * stabScale;       // AoA above trim -> nose down (+X)
     // Deploying flaps shifts the center of lift aft, trimming the nose down a touch.
-    pitchRateTarget += 0.04 * aircraft.flapsStage * stabScale;                    // +X = nose down
+    pitchRateTarget += 0.04 * aircraft.flapsStage * aircraft.flapEffectiveness * stabScale; // +X = nose down
     yawRateTarget += T.yawStability * sideslipRad * stabScale;                    // yaw toward the airflow (+Y = toward +X)
     rollRateTarget += -T.dihedral * dihedralGain * sideslipRad * stabScale;       // lateral stability -> level the wings
 

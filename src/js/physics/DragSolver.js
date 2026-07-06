@@ -12,11 +12,13 @@ export class DragSolver {
     // Clean airframe zero-lift drag.
     let cd0 = config.dragCoefficientZero;
 
-    // Flaps: extra camber and exposed structure. Stage 2 (landing) is draggy by design.
+    // Flaps: extra camber and exposed structure. Stage 2 (landing) is draggy by
+    // design. Blowback (flapEffectiveness) removes the drag along with the lift.
+    const flapEff = aircraft.flapEffectiveness ?? 1.0;
     if (aircraft.flapsStage === 1) {
-      cd0 += 0.013;
+      cd0 += 0.013 * flapEff;
     } else if (aircraft.flapsStage === 2) {
-      cd0 += 0.055;
+      cd0 += 0.055 * flapEff;
     }
 
     // Extended landing gear: struts, doors and wheels in the airstream.

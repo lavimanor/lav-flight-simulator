@@ -17,7 +17,7 @@ export class InputManager {
   }
 
   handleKeyDown(e) {
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift', 'Control'].includes(e.key)) {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift', 'Control', 'Home', 'End'].includes(e.key)) {
       e.preventDefault();
     }
     this.keys[e.code] = true;
@@ -50,10 +50,20 @@ export class InputManager {
           aircraft.controls.brakes = !aircraft.controls.brakes;
           console.log(`[InputManager] Wheel Brakes toggled: ${aircraft.controls.brakes}`);
         }
+        if (e.code === 'KeyT' && !aircraft.isCrashed) {
+          aircraft.controls.pitchTrim = 0.0;
+          console.log('[InputManager] Pitch trim recentred.');
+        }
         if (e.code === 'KeyR' && aircraft.isCrashed) {
           this.respawnAircraft(aircraft);
         }
       }
+    }
+
+    // Controls reference card (works even in menus / after a crash).
+    if (e.code === 'KeyH') {
+      const panel = document.getElementById('hud-help-panel');
+      if (panel) panel.classList.toggle('hidden');
     }
   }
 
@@ -123,6 +133,16 @@ export class InputManager {
     if (this.keys['KeyD'] || this.keys['ArrowRight']) kbRoll = 1.0;
     if (this.keys['KeyQ']) kbYaw = -1.0;
     if (this.keys['KeyE']) kbYaw = 1.0;
+
+    // Pitch trim: held keys walk the trim setting (End = nose up, Home = nose
+    // down, matching +pitch = nose up); T recentres it instantly.
+    const trimRate = 0.30 * deltaTime;
+    if (this.keys['End']) {
+      aircraft.controls.pitchTrim = Math.min((aircraft.controls.pitchTrim || 0) + trimRate, 0.5);
+    }
+    if (this.keys['Home']) {
+      aircraft.controls.pitchTrim = Math.max((aircraft.controls.pitchTrim || 0) - trimRate, -0.5);
+    }
 
     if (aircraft.engineOn && aircraft.engineSpool > 0.8) {
       if (this.keys['ShiftLeft'] || this.keys['Space']) kbThrottleDelta = 1.0;

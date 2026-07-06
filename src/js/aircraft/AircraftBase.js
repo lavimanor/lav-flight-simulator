@@ -16,8 +16,11 @@ export class AircraftBase {
       roll: 0,
       yaw: 0,
       throttle: 0,
-      brakes: false 
+      pitchTrim: 0,
+      brakes: false
     };
+    this.flapEffectiveness = 1.0;
+    this.spawnCount = 0;
     this.airspeed = 0.0;
     this.indicatedAirspeed = 0.0;
     this.groundSpeed = 0.0;
@@ -81,6 +84,14 @@ export class AircraftBase {
     this.airbrakesActive = false;
     this.afterburnerActive = false;
     this.controls.throttle = 0.0;
+    this.controls.pitchTrim = 0.0;
+    // Clear the input-shaping filters so a respawn doesn't inherit the last
+    // stick deflection from the moment of the crash.
+    this.controls.pitchSmoothed = 0.0;
+    this.controls.rollSmoothed = 0.0;
+    this.controls.yawSmoothed = 0.0;
+    this.flapEffectiveness = 1.0;
+    this.spawnCount += 1;
     if (this.gearGroup) this.gearGroup.visible = true;
     if (this.afterburnerGroup) this.afterburnerGroup.visible = false;
     scene.add(this.group);
