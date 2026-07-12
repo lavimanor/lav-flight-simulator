@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Noise } from '../utils/Noise.js';
+import { getTerrainHeightAt } from '../utils/TerrainHeight.js';
 import { Aerodynamics } from './Aerodynamics.js';
 import { Atmosphere } from './Atmosphere.js';
 import { PropulsionSolver } from './PropulsionSolver.js';
@@ -122,6 +123,18 @@ export class FlightPhysicsSolver {
     }
 
     // --- Relative airflow, angle of attack, sideslip -------------------------
+    // Surface boundary layer: friction with the terrain slows the wind near the
+    // ground (power-law profile), so the flare and rollout happen in calmer air
+    // than the winds aloft, and gusts on short final lose most of their teeth.
+    const blDepth = 150.0;
+    totalWind.multiplyScalar(
+      Math.pow(THREE.MathUtils.clamp(heightAboveGround / blDepth, 0.08, 1.0), 0.35));
+    // Surface-adjusted wind published for the HUD (speed + direction it blows FROM).
+    aircraft.windSpeedKts = totalWind.length() * 1.94384;
+    let windFromDeg = Math.atan2(totalWind.x, -totalWind.z) * (180 / Math.PI);
+    if (windFromDeg < 0) windFromDeg += 360;
+    aircraft.windFromDeg = Math.round(windFromDeg) % 360;
+
     const relVel = aircraft.velocity.clone().sub(totalWind);
     const V = relVel.length();                       // true airspeed magnitude
     const forwardSpeed = relVel.dot(forward);
@@ -138,6 +151,13 @@ export class FlightPhysicsSolver {
 
     const currentMass = (config.emptyWeight ?? 800) + aircraft.fuel;
     const weightN = currentMass * 9.81;
+
+    // Per-aircraft stall angle: deltas and highly-swept fighters keep flying to
+    // far higher alpha than a straight-wing trainer. Falls back to the classic
+    // ~15 degrees when the config doesn't specify one.
+    const critAoA = config.criticalAoADeg
+      ? config.criticalAoADeg * (Math.PI / 180)
+      : Aerodynamics.criticalAoA;
 
     // Ground effect: within one wingspan of the surface, lift improves.
     let geLiftMultiplier = 1.0;
@@ -224,6 +244,16 @@ export class FlightPhysicsSolver {
       if (aircraft.position.y < restY) aircraft.position.y = restY;
       if (aircraft.velocity.y < 0) aircraft.velocity.y = 0;
 
+      // Touchdown event: record it for the HUD landing-rate readout, and let a
+      // firm arrival rebound off the gear struts instead of sticking like glue.
+      if (wasAirborne) {
+        aircraft.lastTouchdownSink = touchdownSink;
+        aircraft.lastTouchdownTime = performance.now();
+        if (touchdownSink > 2.2 && !aircraft.gearRetracted) {
+          aircraft.velocity.y = touchdownSink * 0.32;
+        }
+      }
+
       // Ground friction is directional. Rolling/braking friction opposes motion
       // ALONG the heading, while the tires resist sideways skidding much more
       // strongly (cornering grip) so nosewheel steering actually curves the
@@ -272,7 +302,13 @@ export class FlightPhysicsSolver {
 
     // --- Collision / crash geometry -----------------------------------------
     const pitchDeg = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1)) * (180 / Math.PI);
-    const bankDeg = Math.abs(aircraft.rotation.z) * (180 / Math.PI);
+    // True bank angle from the body axes (positive = right wing down). The raw
+    // Euler z is only the bank while the heading is near the runway axis; once
+    // the aircraft turns, an XYZ Euler smears the bank across x and z and the
+    // wingtip-strike check fires at the wrong attitudes.
+    const bankRad = Math.atan2(port.y, up.y);
+    const bankDeg = Math.abs(bankRad) * (180 / Math.PI);
+    aircraft.bankDeg = bankRad * (180 / Math.PI);
 
     const nose = aircraft.position.clone().addScaledVector(forward, length * 0.45);
     const tail = aircraft.position.clone().addScaledVector(forward, -length * 0.45);
@@ -307,8 +343,24 @@ export class FlightPhysicsSolver {
 
     // --- Stall / spin state --------------------------------------------------
     const airborne = heightAboveGround > 2.0;
-    aircraft.isStalled = airborne && Math.abs(aoaRad) > Aerodynamics.criticalAoA;
+    aircraft.isStalled = airborne && Math.abs(aoaRad) > critAoA;
     const stallFactor = aircraft.isStalled ? 0.35 : 1.0;
+
+    // Pre-stall buffet: separated flow starts beating on the airframe a few
+    // degrees BEFORE the wing lets go — the aerodynamic stall warning every
+    // pilot is taught to feel for. Ramps from nothing at ~80% of the critical
+    // angle to a firm shake right at the break.
+    const aoaFraction = Math.abs(aoaRad) / critAoA;
+    aircraft.buffetIntensity = (airborne && !aircraft.isStalled)
+      ? THREE.MathUtils.clamp((aoaFraction - 0.80) / 0.20, 0.0, 1.0)
+      : (aircraft.isStalled ? 1.0 : 0.0);
+    if (aircraft.buffetIntensity > 0 && !aircraft.isStalled) {
+      const tPre = performance.now() * 0.006;
+      const nzB = FlightPhysicsSolver.noise;
+      const amp = 0.8 * aircraft.buffetIntensity;
+      aircraft.angularVelocity.x += (nzB.noise2D(tPre, 3.1) - 0.5) * amp * dt;
+      aircraft.angularVelocity.z += (nzB.noise2D(tPre, 57.9) - 0.5) * amp * 1.5 * dt;
+    }
 
     if (aircraft.isStalled) {
       // A stalled wing drops its nose. Buffet is turbulence-like shaking (from
@@ -364,9 +416,14 @@ export class FlightPhysicsSolver {
       pitchCmdEff = pitchCmd * THREE.MathUtils.clamp(gLimit + 0.5 - aircraft.gForce, 0.0, 1.0);
     }
 
+    // Ailerons wash out approaching the stall: they live on the outboard wing,
+    // which is the first part of the flow to separate, so roll authority fades
+    // with the pre-stall buffet and is weakest right at the break.
+    const aileronEff = 1.0 - 0.45 * (aircraft.buffetIntensity || 0);
+
     // Commanded body rates (rad/s). Axis mapping: nose-up = -X, roll-right = +Z, yaw-right = -Y.
     let pitchRateTarget = -pitchCmdEff * config.pitchRate * pitchYawAuthority;
-    let rollRateTarget = rollCmd * config.rollRate * authority;
+    let rollRateTarget = rollCmd * config.rollRate * authority * aileronEff;
     let yawRateTarget = -yawCmd * config.yawRate * pitchYawAuthority;
 
     // Static stability, expressed as restoring rates:
@@ -406,6 +463,9 @@ export class FlightPhysicsSolver {
       const lowSpeedFactor = THREE.MathUtils.clamp(45.0 / Math.max(V, 15.0), 0.4, 3.0);
       yawRateTarget += 0.030 * powerFrac * twr * lowSpeedFactor;   // yaw LEFT (+Y)
       rollRateTarget -= 0.018 * powerFrac * twr * lowSpeedFactor;  // roll LEFT (-Z)
+      // NOTE: do NOT add gyroscopic precession here by coupling pitch/yaw
+      // rates (or commands) across axes — in this rate-command model that
+      // feedback loop diverges into a lateral oscillation (verified twice).
     }
 
     // G-limiter part 2 (command shaping): a steady pitch rate q at speed V pulls
@@ -424,7 +484,7 @@ export class FlightPhysicsSolver {
     // get no such protection and will stall if hauled back hard.
     const flyByWire = config.flyByWire ?? ['f16', 'f22', 'f35', 'b2'].includes(config.id);
     if (flyByWire && !onGround && pitchRateTarget < 0) { // negative X = nose up
-      const aoaMax = Aerodynamics.criticalAoA * 0.92;
+      const aoaMax = critAoA * 0.92;
       const aoaRoom = THREE.MathUtils.clamp((aoaMax - aoaRad) / (0.30 * aoaMax), 0.0, 1.0);
       pitchRateTarget *= aoaRoom;
     }
@@ -440,16 +500,22 @@ export class FlightPhysicsSolver {
       pitchRateTarget *= room;
     }
 
-    const respPitch = 1.0 - Math.exp(-T.pitchResponse * dt);
-    const respRoll = 1.0 - Math.exp(-T.rollResponse * dt);
-    const respYaw = 1.0 - Math.exp(-T.yawResponse * dt);
+    // Rotational inertia feel: a 52 m flying wing takes visibly longer to REACH
+    // a commanded rate than a 6 m biplane, independent of how fast the peak
+    // rates (config pitchRate/rollRate) are. Scale the rate-convergence speed
+    // by airframe size so heavies feel ponderous and aerobats feel snappy.
+    const agility = config.agility
+      ?? THREE.MathUtils.clamp(Math.sqrt(10.0 / Math.max(span, 1.0)), 0.55, 1.30);
+    const respPitch = 1.0 - Math.exp(-T.pitchResponse * agility * dt);
+    const respRoll = 1.0 - Math.exp(-T.rollResponse * agility * dt);
+    const respYaw = 1.0 - Math.exp(-T.yawResponse * agility * dt);
 
     if (aircraft.isSpinning) {
       // Fully developed spin: rolling and yawing in the same direction, nose down.
       aircraft.angularVelocity.z = aircraft.spinDir * 3.0;
       aircraft.angularVelocity.y = -aircraft.spinDir * 1.2;
       aircraft.angularVelocity.x = 0.5;
-      if (aircraft.controls.pitch < -0.5 && Math.abs(aoaRad) < Aerodynamics.criticalAoA) {
+      if (aircraft.controls.pitch < -0.5 && Math.abs(aoaRad) < critAoA) {
         aircraft.isSpinning = false;
         aircraft.isStalled = false;
       }
@@ -465,6 +531,11 @@ export class FlightPhysicsSolver {
         const steerGrip = THREE.MathUtils.clamp(forwardSpeed / 8.0, 0, 1)
           * THREE.MathUtils.clamp(1.4 - forwardSpeed / 60.0, 0.35, 1.0);
         aircraft.angularVelocity.y = -yawCmd * config.yawRate * steerGrip;
+        // Crosswind weathervaning: the fin is aft of the wheels, so a crosswind
+        // pushes the tail downwind and the nose INTO the wind during the
+        // takeoff/landing roll. The pilot holds it straight with rudder.
+        aircraft.angularVelocity.y += 0.5 * T.yawStability * sideslipRad
+          * THREE.MathUtils.clamp(forwardSpeed / 25.0, 0.0, 1.0);
       } else {
         aircraft.angularVelocity.y = 0;
       }
@@ -548,24 +619,25 @@ export class FlightPhysicsSolver {
     aircraft.sideslipDeg = sideslipRad * (180 / Math.PI);
     aircraft.machNumber = machNumber;
     aircraft.heightAGL = aircraft.position.y - terrainNow;
+
+    // GPWS forward-looking terrain probe: projected clearance over the terrain
+    // ~5 seconds along the current flight path. The HUD raises TERRAIN when this
+    // collapses while the aircraft is clean and moving fast.
+    const horizSpeedNow = Math.hypot(aircraft.velocity.x, aircraft.velocity.z);
+    if (!onGround && horizSpeedNow > 30.0) {
+      const tAhead = 5.0;
+      const aheadX = aircraft.position.x + aircraft.velocity.x * tAhead;
+      const aheadZ = aircraft.position.z + aircraft.velocity.z * tAhead;
+      const aheadY = aircraft.position.y + aircraft.velocity.y * tAhead;
+      aircraft.terrainClearanceAhead = aheadY - FlightPhysicsSolver.getTerrainHeightAt(aheadX, aheadZ);
+    } else {
+      aircraft.terrainClearanceAhead = Infinity;
+    }
   }
 
+  // Shared heightfield (utils/TerrainHeight.js) — the same surface the visual
+  // terrain is meshed from, so crash probes always agree with what is drawn.
   static getTerrainHeightAt(worldX, worldZ) {
-    const scale = this.elevationScale;
-    const n = this.noise.fbm2D(worldX * scale, worldZ * scale, 4);
-    const rawHeight = Math.pow(n, 1.4) * this.maxElevation;
-    const distToCenter = Math.abs(worldX);
-
-    if (worldZ > -1500 && worldZ < 2500) {
-      const airfieldElevation = 180.0;
-      if (distToCenter < 80) {
-        return airfieldElevation;
-      } else if (distToCenter < 600) {
-        const t = (distToCenter - 80) / 520;
-        const smoothT = t * t * (3 - 2 * t);
-        return THREE.MathUtils.lerp(airfieldElevation, rawHeight, smoothT);
-      }
-    }
-    return rawHeight;
+    return getTerrainHeightAt(worldX, worldZ);
   }
 }

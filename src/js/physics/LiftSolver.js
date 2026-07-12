@@ -7,8 +7,10 @@ export class LiftSolver {
   static solve(aircraft, airDensity, geLiftMultiplier, aoaRad, speed, mach = 0) {
     const config = aircraft.config;
 
-    // Base lift coefficient from the wing's polar curve (Mach-corrected).
-    const baseCL = Aerodynamics.getLiftCoefficient(aoaRad, config.liftCoefficientMax, mach);
+    // Base lift coefficient from the wing's polar curve (Mach-corrected), using
+    // the aircraft's own stall angle when the config specifies one.
+    const critAoA = config.criticalAoADeg ? config.criticalAoADeg * (Math.PI / 180) : null;
+    const baseCL = Aerodynamics.getLiftCoefficient(aoaRad, config.liftCoefficientMax, mach, critAoA);
 
     // High-lift flap surfaces add camber (extra CL) at the low-speed settings.
     // flapEffectiveness (from the physics solver) folds the benefit away above

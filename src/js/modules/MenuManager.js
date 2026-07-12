@@ -76,6 +76,9 @@ export class MenuManager {
     this.isOpen = true;
     this.modal.classList.remove('hidden');
     if (this.preview) {
+      // The canvas has zero size while the modal is display:none, so the
+      // renderer must be resized once the layout is actually visible.
+      this.preview.resize();
       this.preview.setAircraft(this.selectedAircraftId);
     }
     this.updateSpecsPanel();
@@ -120,11 +123,18 @@ export class MenuManager {
     this.closeMenu();
   }
 
+  // Role badge shown on each card and next to the preview.
+  static badgeFor(config) {
+    if (!config.isJet) return { label: 'PROP', cls: 'prop' };
+    if (config.hasAfterburner) return { label: 'AB JET', cls: 'ab' };
+    return { label: 'JET', cls: 'jet' };
+  }
+
   updateSpecsPanel() {
-    const specEngine = document.getElementById('spec-engine');
-    const specThrust = document.getElementById('spec-thrust');
-    const specRoll = document.getElementById('spec-roll');
-    if (!specEngine || !specThrust || !specRoll) return;
+    const rows = document.getElementById('preview-specs-rows');
+    const bars = document.getElementById('preview-stat-bars');
+    const nameTag = document.getElementById('preview-aircraft-name');
+    if (!rows || !bars) return;
 
     if (!this.aircraftManager) {
       this.aircraftManager = this.engine.moduleManager.get('Aircraft');
@@ -132,44 +142,81 @@ export class MenuManager {
     const config = this.aircraftManager ? this.aircraftManager.configs[this.selectedAircraftId] : null;
     if (!config) return;
 
-    // Dynamically retrieve parameters directly from the parsed plane profile
-    specEngine.textContent = config.engineType ?? "Single Propeller";
-    
-    // Convert base Newtons into a user-friendly kilonewtons (kN) format
-    const thrustKn = (config.maxThrust / 1000).toFixed(1);
-    specThrust.textContent = `${thrustKn} kN`;
-    
-    specRoll.textContent = `${config.rollRate.toFixed(2)} rad/s`;
+    if (nameTag) nameTag.textContent = config.name;
+
+    const topSpeedKts = Math.round((config.terminalSpeed ?? 60) * 1.944);
+    // Level-flight stall speed at gross weight (same formula as the solver).
+    const stallKts = Math.round(Math.sqrt(
+      (2 * config.mass * 9.81) / (1.225 * config.wingArea * config.liftCoefficientMax)) * 1.944);
+    const massT = (config.mass / 1000).toFixed(1);
+    rows.innerHTML = `
+      <div><span>Engine</span> <span>${config.engineType ?? 'Single Propeller'}</span></div>
+      <div><span>Max Thrust</span> <span>${(config.maxThrust / 1000).toFixed(1)} kN</span></div>
+      <div><span>Gross Weight</span> <span>${massT} t</span></div>
+      <div><span>Wingspan</span> <span>${config.dimensions.span.toFixed(1)} m</span></div>
+      <div><span>Top Speed</span> <span>${topSpeedKts} kts</span></div>
+      <div><span>Stall Speed</span> <span>${stallKts} kts</span></div>
+      <div><span>G-Limit</span> <span>${(config.pitchGScale ?? 6).toFixed(1)} G</span></div>
+    `;
+
+    // Relative stat bars, normalized against the top of the current fleet.
+    const speedPct = Math.round(Math.min((config.terminalSpeed ?? 60) / 185, 1) * 100);
+    const agilityPct = Math.round(Math.min(config.rollRate / 4.5, 1) * 100);
+    const powerPct = Math.round(Math.min(config.maxThrust / (config.mass * 9.81), 1.15) / 1.15 * 100);
+    const bar = (label, pct) => `
+      <div class="stat-bar-row">
+        <span class="stat-label">${label}</span>
+        <div class="stat-track"><div class="stat-fill" style="width:${pct}%"></div></div>
+      </div>`;
+    bars.innerHTML = bar('SPEED', speedPct) + bar('AGILITY', agilityPct) + bar('POWER', powerPct);
   }
 
   renderAircraftCards() {
     const container = document.querySelector('.aircraft-cards-container');
     if (!container) return;
-    container.innerHTML = ''; 
+    container.innerHTML = '';
 
     if (!this.aircraftManager) {
       this.aircraftManager = this.engine.moduleManager.get('Aircraft');
     }
     const configs = this.aircraftManager ? this.aircraftManager.configs : {};
-    
-    Object.keys(configs).forEach((id, index) => {
+
+    // Hangar order: light trainers first, heavies last. Unknown ids append at the end.
+    const preferredOrder = ['trainer', 'stunt', 'warbird', 'fighter', 'f16', 'f22', 'f35', 'attack', 'sr71', 'b2', 'kc135', 'b52', 'cargo', 'debug'];
+    const ids = Object.keys(configs).sort((a, b) => {
+      const ia = preferredOrder.indexOf(a), ib = preferredOrder.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+
+    // Keep the pilot's previous selection when the list re-renders.
+    if (!ids.includes(this.selectedAircraftId) && ids.length > 0) {
+      this.selectedAircraftId = ids[0];
+    }
+
+    ids.forEach((id) => {
       const config = configs[id];
       const card = document.createElement('div');
-      card.className = `aircraft-card${index === 0 ? ' selected' : ''}`;
+      card.className = `aircraft-card${id === this.selectedAircraftId ? ' selected' : ''}`;
       card.setAttribute('data-id', id);
-      
+
       const desc = config.description || `Configured ${config.name} model.`;
+      const badge = MenuManager.badgeFor(config);
+      const topSpeedKts = Math.round((config.terminalSpeed ?? 60) * 1.944);
       card.innerHTML = `
-        <div class="card-title">${config.name}</div>
+        <div class="card-head">
+          <span class="card-title">${config.name}</span>
+          <span class="card-badge ${badge.cls}">${badge.label}</span>
+        </div>
         <p class="description">${desc}</p>
+        <div class="card-mini-specs">
+          <span>${topSpeedKts} kt</span>
+          <span>${(config.pitchGScale ?? 6).toFixed(1)} G</span>
+          <span>${(config.mass / 1000).toFixed(1)} t</span>
+        </div>
       `;
       container.appendChild(card);
     });
 
-    const firstId = Object.keys(configs)[0];
-    if (firstId) {
-      this.selectedAircraftId = firstId;
-    }
     this.cards = Array.from(document.querySelectorAll('.aircraft-card'));
     this.bindCardEvents();
   }

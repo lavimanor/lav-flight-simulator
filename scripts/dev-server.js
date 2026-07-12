@@ -6,7 +6,7 @@ const { createReadStream, existsSync, statSync } = require('fs');
 const { join, normalize, extname } = require('path');
 
 const root = join(__dirname, '..');
-const port = Number(process.argv[2]) || 8347;
+const port = Number(process.argv[2]) || Number(process.env.PORT) || 8347;
 
 const mime = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',

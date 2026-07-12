@@ -76,7 +76,10 @@ export class CameraManager {
 
     const settings = this.engine.moduleManager.get('Settings');
     const buffetingActive = settings ? settings.enableCamShake : true;
-    const totalBuffet = buffetingActive ? (transonicBuffet + gBuffet + stallBuffet) : 0.0;
+    // AoA-driven pre-stall buffet from the physics: unlike the IAS proxy above,
+    // this also fires in accelerated (high-G) stalls at cruise speed.
+    const aoaBuffet = (aircraft.buffetIntensity ?? 0.0) * 0.5;
+    const totalBuffet = buffetingActive ? (transonicBuffet + gBuffet + stallBuffet + aoaBuffet) : 0.0;
 
     const shakeOffset = new THREE.Vector3();
     if (totalBuffet > 0.01) {
@@ -124,8 +127,10 @@ export class CameraManager {
       camera.lookAt(this.currentLookAt);
       this.isFirstFrame = false;
     } else {
-      camera.position.lerp(this.targetCameraPos, 8.0 * deltaTime);
-      this.currentLookAt.lerp(this.targetLookAt, 8.0 * deltaTime);
+      // Exponential form so a slow frame (dt > 1/8 s) can't overshoot the target.
+      const lerpFactor = 1.0 - Math.exp(-8.0 * deltaTime);
+      camera.position.lerp(this.targetCameraPos, lerpFactor);
+      this.currentLookAt.lerp(this.targetLookAt, lerpFactor);
       camera.lookAt(this.currentLookAt);
     }
   }

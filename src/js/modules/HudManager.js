@@ -80,7 +80,24 @@ export class HudManager {
     this.airbrakesWarning = document.getElementById('hud-airbrakes-warning');
     this.abWarning = document.getElementById('hud-ab-warning');
 
+    // Attitude / envelope / GPWS caution boxes
+    this.pullupWarning = document.getElementById('hud-pullup-warning');
+    this.terrainWarning = document.getElementById('hud-terrain-warning');
+    this.sinkrateWarning = document.getElementById('hud-sinkrate-warning');
+    this.bankWarning = document.getElementById('hud-bank-warning');
+    this.overspeedWarning = document.getElementById('hud-overspeed-warning');
+    this.overgWarning = document.getElementById('hud-overg-warning');
+    this.gearupWarning = document.getElementById('hud-gearup-warning');
+    this.lowfuelWarning = document.getElementById('hud-lowfuel-warning');
+
     this.trimVal = document.getElementById('hud-trim-val');
+    this.windVal = document.getElementById('hud-wind-val');
+
+    // Touchdown-quality toast
+    this.touchdownToast = document.getElementById('hud-touchdown-toast');
+    this.touchdownRating = document.getElementById('hud-touchdown-rating');
+    this.touchdownRate = document.getElementById('hud-touchdown-rate');
+    this.lastTouchdownShown = 0;
 
     this.generateProceduralPitchLadder();
     this.generateHeadingTape();
@@ -257,8 +274,42 @@ export class HudManager {
         // New aerodynamic readouts from the physics solver
         if (this.aoaVal) {
           const aoa = aircraft.aoaDeg ?? 0;
+          // Color thresholds track this airframe's actual stall angle.
+          const critDeg = aircraft.config.criticalAoADeg ?? 15;
           this.aoaVal.textContent = `${aoa.toFixed(1)}°`;
-          this.aoaVal.style.color = aoa > 12.0 ? '#ff5555' : (aoa > 9.0 ? '#ffea00' : '#00ff66');
+          this.aoaVal.style.color = aoa > critDeg * 0.8 ? '#ff5555' : (aoa > critDeg * 0.6 ? '#ffea00' : '#00ff66');
+        }
+
+        // Surface wind readout (direction it blows FROM / speed).
+        if (this.windVal) {
+          const wKts = aircraft.windSpeedKts ?? 0;
+          if (wKts < 1.5) {
+            this.windVal.textContent = 'CALM';
+            this.windVal.style.color = '#00ff66';
+          } else {
+            const dir = String(aircraft.windFromDeg ?? 0).padStart(3, '0');
+            this.windVal.textContent = `${dir}° / ${Math.round(wKts)} KT`;
+            this.windVal.style.color = wKts > 20 ? '#ffea00' : '#00ff66';
+          }
+        }
+
+        // Touchdown-quality toast: rate the landing the moment the wheels kiss.
+        if (this.touchdownToast && aircraft.lastTouchdownTime && aircraft.lastTouchdownTime !== this.lastTouchdownShown && !aircraft.isCrashed) {
+          this.lastTouchdownShown = aircraft.lastTouchdownTime;
+          const sink = aircraft.lastTouchdownSink ?? 0;
+          const fpm = Math.round(sink * 196.85);
+          let rating, color;
+          if (sink < 0.7) { rating = 'BUTTER'; color = '#00ff66'; }
+          else if (sink < 1.5) { rating = 'SMOOTH'; color = '#8aff8a'; }
+          else if (sink < 2.5) { rating = 'FIRM'; color = '#ffea00'; }
+          else if (sink < 4.5) { rating = 'HARD — BOUNCED'; color = '#ff9933'; }
+          else { rating = 'SEVERE'; color = '#ff5555'; }
+          this.touchdownRating.textContent = rating;
+          this.touchdownRating.style.color = color;
+          this.touchdownRate.textContent = `-${fpm} FPM`;
+          this.touchdownToast.classList.remove('hidden');
+          clearTimeout(this.touchdownToastTimer);
+          this.touchdownToastTimer = setTimeout(() => this.touchdownToast.classList.add('hidden'), 4000);
         }
         if (this.machVal) {
           const mach = aircraft.machNumber ?? 0;
@@ -293,6 +344,47 @@ export class HudManager {
             this.spinWarning.classList.add('hidden');
           }
         }
+
+        // Envelope & GPWS-style warnings ---------------------------------------
+        const show = (el, on) => { if (el) el.classList.toggle('hidden', !on); };
+        const agl = aircraft.heightAGL ?? 0;
+        const airborneWarn = agl > 5.0 && !aircraft.isCrashed && !aircraft.isSinking;
+        const vs = aircraft.verticalSpeed ?? 0;
+
+        // Excessive bank: past 65 degrees the wing spends its lift turning, not
+        // holding the aircraft up.
+        show(this.bankWarning, airborneWarn && Math.abs(aircraft.bankDeg ?? 0) > 65);
+
+        // GPWS mode 1: sink rate excessive for the current height. The allowed
+        // sink grows with altitude so a normal 3-degree approach stays quiet.
+        const sinkRateExcessive = airborneWarn && vs < -(4.0 + agl / 20.0) && agl < 450;
+        const pullUp = airborneWarn && vs < -(8.0 + agl / 10.0) && agl < 350;
+        show(this.pullupWarning, pullUp);
+        show(this.sinkrateWarning, sinkRateExcessive && !pullUp);
+
+        // Forward-looking terrain closure (published by the physics solver).
+        // Inhibited with the gear down so a landing approach doesn't blare.
+        const terrainAhead = airborneWarn && aircraft.gearRetracted
+          && (aircraft.terrainClearanceAhead ?? Infinity) < 40.0;
+        show(this.terrainWarning, terrainAhead && !pullUp);
+
+        // VNE overspeed: indicated airspeed beyond the airframe's placard.
+        const vneIAS = aircraft.config.vneIAS ?? ((aircraft.config.terminalSpeed ?? 60) * 1.05);
+        show(this.overspeedWarning, !aircraft.isCrashed && aircraft.indicatedAirspeed > vneIAS);
+
+        // Riding the structural G-limit (the FBW limiter caps just below it).
+        const gLimitCfg = aircraft.config.pitchGScale ?? 6.0;
+        show(this.overgWarning, airborneWarn && aircraft.gForce > gLimitCfg - 0.3);
+
+        // Landing-configuration check: low, slow and descending with the wheels up.
+        const stallIAS = aircraft.stallSpeedIAS ?? 0;
+        const gearUpLanding = airborneWarn && aircraft.gearRetracted && agl < 120
+          && vs < -0.5 && stallIAS > 0 && aircraft.indicatedAirspeed < stallIAS * 1.7;
+        show(this.gearupWarning, gearUpLanding);
+
+        // Fuel state (matches the FUEL readout's red threshold).
+        show(this.lowfuelWarning, !aircraft.isCrashed && aircraft.fuel > 0
+          && aircraft.fuel < (aircraft.config.maxFuelCapacity ?? 0) * 0.15);
 
         // Takeoff / Landing configurations displays
         if (this.gearVal) {

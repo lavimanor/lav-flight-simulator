@@ -145,8 +145,8 @@ export class InputManager {
     }
 
     if (aircraft.engineOn && aircraft.engineSpool > 0.8) {
-      if (this.keys['ShiftLeft'] || this.keys['Space']) kbThrottleDelta = 1.0;
-      if (this.keys['ControlLeft'] || this.keys['KeyX']) kbThrottleDelta = -1.0;
+      if (this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['Space']) kbThrottleDelta = 1.0;
+      if (this.keys['ControlLeft'] || this.keys['ControlRight'] || this.keys['KeyX']) kbThrottleDelta = -1.0;
     }
 
     // 2. Process Hardware Analog Axes and Single-Pulse States

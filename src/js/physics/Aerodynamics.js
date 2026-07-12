@@ -27,8 +27,9 @@ export class Aerodynamics {
   // Returns the lift coefficient for a given angle of attack.
   // Below the critical angle the curve is linear; beyond it the wing stalls and
   // lift falls off toward a low flat-plate value instead of staying pinned at max.
-  static getLiftCoefficient(aoa, maxCL = 1.4, mach = 0) {
-    const crit = this.criticalAoA;
+  // criticalAoARad lets swept/delta planforms carry lift to higher alpha.
+  static getLiftCoefficient(aoa, maxCL = 1.4, mach = 0, criticalAoARad = null) {
+    const crit = criticalAoARad ?? this.criticalAoA;
     const absAoA = Math.abs(aoa);
     const sign = aoa < 0 ? -1 : 1;
     const slope = this.liftCurveSlope * this.compressibilityFactor(mach);

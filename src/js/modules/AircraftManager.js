@@ -31,7 +31,7 @@ export class AircraftManager {
   }
 
   async loadAllAircraftConfigs() {
-    let ids = ['trainer', 'fighter', 'stunt', 'cargo']; // Fallback list
+    let ids = ['trainer', 'stunt', 'warbird', 'fighter', 'f16', 'f22', 'f35', 'attack', 'sr71', 'b2', 'kc135', 'b52', 'cargo', 'debug']; // Fallback list
     
     // Dynamic scan via Electron IPC bridge if available
     if (window.electronAPI && typeof window.electronAPI.readAircraftDirectory === 'function') {

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Noise } from '../utils/Noise.js';
+import { getTerrainHeightAt } from '../utils/TerrainHeight.js';
 
 export class TerrainManager {
   constructor() {
@@ -7,9 +8,8 @@ export class TerrainManager {
     this.aircraftManager = null;
     this.noise = new Noise(12345);
     this.chunkSize = 4000;
-    this.chunkSegments = 32;
-    this.maxElevation = 700;
-    this.noiseScale = 0.00015;
+    this.chunkSegments = 48;
+    this.viewRadius = 2;
     this.chunks = new Map();
     this.activeCoords = new THREE.Vector2();
     this.runwayGroup = null;
@@ -154,7 +154,7 @@ export class TerrainManager {
   }
   updateActiveTerrain(centerX, centerZ) {
     const scene = this.engine.scene;
-    const viewRadius = 1;
+    const viewRadius = this.viewRadius;
     const activeKeys = new Set();
     for (let dx = -viewRadius; dx <= viewRadius; dx++) {
       for (let dz = -viewRadius; dz <= viewRadius; dz++) {
@@ -185,24 +185,47 @@ export class TerrainManager {
     const positions = geometry.attributes.position;
     const colors = [];
     const waterLevel = 135.0;
+    // Reusable palette (avoids allocating Colors per vertex).
+    const cSand = new THREE.Color(0xd2b48c);
+    const cGrassLow = new THREE.Color(0x283e20);
+    const cGrassHigh = new THREE.Color(0x3e522b);
+    const cDirt = new THREE.Color(0x5c503b);
+    const cRock = new THREE.Color(0x6e6a63);
+    const cSnow = new THREE.Color(0xffffff);
+    const color = new THREE.Color();
     for (let i = 0; i < positions.count; i++) {
       const vx = positions.getX(i) + chunkWorldX;
       const vz = positions.getZ(i) + chunkWorldZ;
       const height = this.getHeightAt(vx, vz);
       positions.setY(i, height);
-      const color = new THREE.Color();
+
+      // Local gradient (central differences) so steep faces read as bare rock
+      // and snow only settles where it can rest.
+      const step = 12.0;
+      const dhx = this.getHeightAt(vx + step, vz) - this.getHeightAt(vx - step, vz);
+      const dhz = this.getHeightAt(vx, vz + step) - this.getHeightAt(vx, vz - step);
+      const slope = Math.hypot(dhx, dhz) / (2 * step); // rise over run
+
       if (height < waterLevel + 4.0) {
-        color.setHex(0xd2b48c);
+        color.copy(cSand);
       } else if (height < 210) {
         const t = (height - (waterLevel + 4.0)) / (210 - (waterLevel + 4.0));
-        color.lerpColors(new THREE.Color(0x283e20), new THREE.Color(0x3e522b), t);
+        color.lerpColors(cGrassLow, cGrassHigh, t);
       } else if (height < 420) {
         const t = (height - 210) / 210;
-        color.lerpColors(new THREE.Color(0x3e522b), new THREE.Color(0x5c503b), t);
+        color.lerpColors(cGrassHigh, cDirt, t);
       } else {
-        const t = Math.min((height - 420) / 180, 1.0);
-        color.lerpColors(new THREE.Color(0x5c503b), new THREE.Color(0xffffff), t);
+        const t = Math.min((height - 420) / 220, 1.0);
+        color.lerpColors(cDirt, cSnow, t);
       }
+      // Steep faces break through to rock, and snow slides off anything steep.
+      if (height >= waterLevel + 4.0) {
+        const rockiness = THREE.MathUtils.clamp((slope - 0.45) / 0.35, 0.0, 1.0);
+        color.lerp(cRock, rockiness * 0.85);
+      }
+      // Subtle per-vertex tint variation breaks up the elevation banding.
+      const jitter = (this.noise.noise2D(vx * 0.008 + 7.3, vz * 0.008 + 2.9) - 0.5) * 0.14;
+      color.offsetHSL(0, 0, jitter * 0.5);
       colors.push(color.r, color.g, color.b);
     }
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -220,21 +243,9 @@ export class TerrainManager {
     scene.add(mesh);
     this.chunks.set(key, { mesh, geometry, material });
   }
+  // Shared heightfield (utils/TerrainHeight.js) — the exact surface the
+  // physics ground probes sample, so what you see is what you hit.
   getHeightAt(worldX, worldZ) {
-    const scale = this.noiseScale;
-    const n = this.noise.fbm2D(worldX * scale, worldZ * scale, 4);
-    const adjustedHeight = Math.pow(n, 1.4) * this.maxElevation;
-    const distToCenter = Math.abs(worldX);
-    if (worldZ > -1500 && worldZ < 2500) {
-      const airfieldElevation = 180.0;
-      if (distToCenter < 80) {
-        return airfieldElevation;
-      } else if (distToCenter < 600) {
-        const t = (distToCenter - 80) / 520;
-        const smoothT = t * t * (3 - 2 * t);
-        return THREE.MathUtils.lerp(airfieldElevation, adjustedHeight, smoothT);
-      }
-    }
-    return adjustedHeight;
+    return getTerrainHeightAt(worldX, worldZ);
   }
 }

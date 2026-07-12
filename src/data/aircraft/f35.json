@@ -11,6 +11,7 @@
   "yawRate": 0.7,
   "dragCoefficientZero": 0.016,
   "liftCoefficientMax": 1.9,
+  "criticalAoADeg": 25,
   "emptyWeight": 11000,
   "maxFuelCapacity": 8300,
   "isJet": true,
