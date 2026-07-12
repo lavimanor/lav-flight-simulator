@@ -115,12 +115,12 @@ html, body {
   background: rgba(0, 25, 5, 0.5);
   border: 1.5px solid rgba(0, 255, 102, 0.4);
   color: #00ff66;
-  text-shadow: 0 0 3px rgba(0, 25, 102, 0.6);
+  text-shadow: 0 0 3px rgba(0, 255, 102, 0.6);
 }
 .menu-secondary-btn:hover {
-  background: rgba(0, 25, 102, 0.15);
+  background: rgba(0, 255, 102, 0.15);
   border-color: #00ff66;
-  box-shadow: 0 0 12px rgba(0, 25, 102, 0.4);
+  box-shadow: 0 0 12px rgba(0, 255, 102, 0.4);
   transform: translateX(6px);
 }
 .menu-footer {
@@ -254,11 +254,11 @@ html, body {
   font-family: Consolas, "Courier New", monospace;
   cursor: pointer;
   text-shadow: 0 0 3px rgba(0, 255, 102, 0.6);
-  box-shadow: 0 0 10px rgba(0, 25, 102, 0.2);
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
   transition: all 0.2s ease;
 }
 #menu-toggle-btn:hover {
-  background: rgba(0, 25, 102, 0.2);
+  background: rgba(0, 255, 102, 0.2);
   box-shadow: 0 0 15px rgba(0, 255, 102, 0.5);
 }
 #hud-btn-mainmenu {
@@ -275,12 +275,12 @@ html, body {
   font-weight: bold;
   font-family: Consolas, "Courier New", monospace;
   cursor: pointer;
-  text-shadow: 0 0 3px rgba(0, 25, 102, 0.6);
-  box-shadow: 0 0 10px rgba(0, 25, 102, 0.2);
+  text-shadow: 0 0 3px rgba(0, 255, 102, 0.6);
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
   transition: all 0.2s ease;
 }
 #hud-btn-mainmenu:hover {
-  background: rgba(0, 25, 102, 0.2);
+  background: rgba(0, 255, 102, 0.2);
   box-shadow: 0 0 15px rgba(0, 255, 102, 0.5);
 }
 #hud-heading-container {
@@ -358,6 +358,33 @@ html, body {
 .tape-bar-indicator.right-aligned {
   float: left;
   border-right: 1.5px dashed rgba(0, 255, 102, 0.4);
+}
+#hud-aircraft-label {
+  position: absolute;
+  bottom: 18px;
+  right: 40px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  pointer-events: none;
+}
+#hud-aircraft-name {
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #00ff66;
+  text-shadow: 0 0 6px rgba(0, 255, 102, 0.5);
+}
+#hud-weather-name {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(0, 255, 102, 0.55);
+  border: 1px solid rgba(0, 255, 102, 0.3);
+  border-radius: 3px;
+  padding: 2px 7px;
+  background: rgba(0, 30, 10, 0.25);
 }
 #hud-help-hint {
   position: absolute;
@@ -837,15 +864,15 @@ html, body {
   transition: all 0.25s ease;
 }
 .aircraft-card:hover {
-  background: rgba(0, 25, 102, 0.03);
-  border-color: rgba(0, 25, 102, 0.4);
+  background: rgba(0, 255, 102, 0.03);
+  border-color: rgba(0, 255, 102, 0.4);
   color: #ffffff;
 }
 .aircraft-card.selected {
-  background: rgba(0, 25, 102, 0.06);
+  background: rgba(0, 255, 102, 0.06);
   border-color: #00ff66;
   color: #00ff66;
-  box-shadow: 0 0 12px rgba(0, 25, 102, 0.15);
+  box-shadow: 0 0 12px rgba(0, 255, 102, 0.15);
 }
 .aircraft-card .card-title {
   font-size: 1.15rem;
@@ -855,7 +882,7 @@ html, body {
 }
 .aircraft-card.selected .card-title {
   color: #00ff66;
-  text-shadow: 0 0 3px rgba(0, 25, 102, 0.3);
+  text-shadow: 0 0 3px rgba(0, 255, 102, 0.3);
 }
 .aircraft-card .description {
   font-size: 11px;
@@ -879,7 +906,7 @@ html, body {
   margin-right: 4px;
 }
 #menu-weather-section {
-  border-top: 1px dashed rgba(0, 25, 102, 0.25);
+  border-top: 1px dashed rgba(0, 255, 102, 0.25);
   margin-bottom: 30px;
   padding-top: 16px;
 }
@@ -907,15 +934,15 @@ html, body {
   transition: all 0.2s ease;
 }
 .weather-btn:hover {
-  background: rgba(0, 25, 102, 0.03);
-  border-color: rgba(0, 25, 102, 0.4);
+  background: rgba(0, 255, 102, 0.03);
+  border-color: rgba(0, 255, 102, 0.4);
   color: #ffffff;
 }
 .weather-btn.selected {
-  background: rgba(0, 25, 102, 0.08);
+  background: rgba(0, 255, 102, 0.08);
   border-color: #00ff66;
   color: #00ff66;
-  box-shadow: 0 0 10px rgba(0, 25, 102, 0.2);
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
 }
 .menu-action-row {
   display: flex;
@@ -939,7 +966,7 @@ html, body {
 #menu-spawn-btn:hover {
   background: #00cc52;
   border-color: #00cc52;
-  box-shadow: 0 0 12px rgba(0, 25, 102, 0.4);
+  box-shadow: 0 0 12px rgba(0, 255, 102, 0.4);
 }
 #menu-close-btn {
   background: transparent;

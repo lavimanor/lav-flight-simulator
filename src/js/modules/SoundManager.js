@@ -16,6 +16,11 @@ export class SoundManager {
     this.gearSound = null;
     this.flapsSound = null;
     this.squealSound = null;
+    this.chimeSound = null;
+    this.clickSound = null;
+    this.thumpSound = null;
+    this.buffetSound = null;
+    this.gpwsSound = null;
     this.masterVolumeScale = 0.8;
     this.engineVolumeScale = 0.7;
     this.windVolumeScale = 0.5;
@@ -27,6 +32,8 @@ export class SoundManager {
     this.lastGearRetracted = false;
     this.lastFlapsStage = 0;
     this.lastOnGround = true;
+    this.lastSpawnCount = -1;
+    this.lastThumpTime = 0;
   }
 
   init(engine) {
@@ -34,6 +41,14 @@ export class SoundManager {
     this.listener = new THREE.AudioListener();
     this.engine.camera.add(this.listener);
     this.loadSystemSounds();
+
+    // One delegated click sound for every interactive control (buttons,
+    // aircraft cards, weather selectors) instead of wiring each handler.
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('button, .aircraft-card, .weather-btn')) {
+        this.playUIClick();
+      }
+    });
   }
 
   loadSystemSounds() {
@@ -111,6 +126,38 @@ export class SoundManager {
       this.squealSound.setBuffer(buffer);
       this.squealSound.setVolume(0.30);
     });
+
+    this.chimeSound = new THREE.Audio(this.listener);
+    audioLoader.load(assetsPath + 'chime.wav', (buffer) => {
+      this.chimeSound.setBuffer(buffer);
+      this.chimeSound.setVolume(0.40);
+    });
+
+    this.clickSound = new THREE.Audio(this.listener);
+    audioLoader.load(assetsPath + 'click.wav', (buffer) => {
+      this.clickSound.setBuffer(buffer);
+      this.clickSound.setVolume(0.30);
+    });
+
+    this.thumpSound = new THREE.Audio(this.listener);
+    audioLoader.load(assetsPath + 'thump.wav', (buffer) => {
+      this.thumpSound.setBuffer(buffer);
+      this.thumpSound.setVolume(0.45);
+    });
+
+    this.buffetSound = new THREE.Audio(this.listener);
+    audioLoader.load(assetsPath + 'buffet.wav', (buffer) => {
+      this.buffetSound.setBuffer(buffer);
+      this.buffetSound.setLoop(true);
+      this.buffetSound.setVolume(0.0);
+    });
+
+    this.gpwsSound = new THREE.Audio(this.listener);
+    audioLoader.load(assetsPath + 'gpws.wav', (buffer) => {
+      this.gpwsSound.setBuffer(buffer);
+      this.gpwsSound.setLoop(true);
+      this.gpwsSound.setVolume(0.25);
+    });
   }
 
   ensureAudioPlayState(aircraft) {
@@ -132,6 +179,9 @@ export class SoundManager {
     if (this.scrapeSound && this.scrapeSound.buffer) {
       this.scrapeSound.play();
     }
+    if (this.buffetSound && this.buffetSound.buffer) {
+      this.buffetSound.play();
+    }
     this.audioInitialized = true;
     console.log(`[SoundManager] Spatial Web Audio context activated.`);
   }
@@ -147,8 +197,28 @@ export class SoundManager {
     const mainMenu = this.engine.moduleManager.get('MainMenu');
     const mainMenuOpen = mainMenu ? mainMenu.isOpen : false;
 
+    // A fresh spawn (respawn or aircraft swap) must resync the edge-detection
+    // state, or the gear/flaps transition sounds fire spuriously on frame one.
+    if (aircraft.spawnCount !== this.lastSpawnCount) {
+      this.lastSpawnCount = aircraft.spawnCount;
+      this.lastGearRetracted = aircraft.gearRetracted;
+      this.lastFlapsStage = aircraft.flapsStage;
+      this.lastOnGround = true;
+      this.lastThumpTime = aircraft.lastTouchdownTime ?? 0;
+    }
+
     if (!mainMenuOpen) {
       this.ensureAudioPlayState(aircraft);
+    } else {
+      // Pre-flight menu: silence the cockpit loops instead of letting them
+      // drone on at whatever volume they had when the pilot left the flight.
+      const loops = [this.trainerEngineSound, this.fighterEngineSound,
+        this.afterburnerSound, this.windSound, this.scrapeSound, this.buffetSound];
+      for (const s of loops) {
+        if (s && s.isPlaying) s.setVolume(0.0);
+      }
+      if (this.alarmSound && this.alarmSound.isPlaying) this.alarmSound.pause();
+      if (this.gpwsSound && this.gpwsSound.isPlaying) this.gpwsSound.pause();
     }
 
     if (this.listener) {
@@ -215,6 +285,41 @@ export class SoundManager {
       }
     }
 
+    // Pre-stall buffet rumble follows the separated-flow intensity from the
+    // physics (also fires in accelerated stalls, unlike an IAS threshold).
+    if (this.buffetSound && this.buffetSound.isPlaying) {
+      const buffet = (!aircraft.isCrashed && !mainMenuOpen) ? (aircraft.buffetIntensity ?? 0) : 0;
+      this.buffetSound.setVolume(buffet * 0.40 * this.effectsVolumeScale);
+      this.buffetSound.setPlaybackRate(0.9 + 0.3 * buffet);
+    }
+
+    // GPWS aural warning: mirrors the HUD PULL UP / TERRAIN AHEAD logic.
+    const agl = aircraft.heightAGL ?? 0;
+    const vs = aircraft.verticalSpeed ?? 0;
+    const airborneWarn = agl > 5.0 && !aircraft.isCrashed && !aircraft.isSinking && !mainMenuOpen;
+    const pullUp = airborneWarn && vs < -(8.0 + agl / 10.0) && agl < 350;
+    const terrainAhead = airborneWarn && aircraft.gearRetracted
+      && (aircraft.terrainClearanceAhead ?? Infinity) < 40.0;
+    if (this.gpwsSound && this.gpwsSound.buffer) {
+      if (pullUp || terrainAhead) {
+        if (!this.gpwsSound.isPlaying) this.gpwsSound.play();
+        this.gpwsSound.setVolume(0.25 * this.effectsVolumeScale);
+      } else if (this.gpwsSound.isPlaying) {
+        this.gpwsSound.pause();
+      }
+    }
+
+    // Touchdown thump: one impact sound per landing, weighted by sink rate.
+    if (aircraft.lastTouchdownTime && aircraft.lastTouchdownTime !== this.lastThumpTime && !mainMenuOpen) {
+      this.lastThumpTime = aircraft.lastTouchdownTime;
+      if (this.thumpSound && this.thumpSound.buffer && !aircraft.isCrashed) {
+        const sink = aircraft.lastTouchdownSink ?? 0;
+        if (this.thumpSound.isPlaying) this.thumpSound.stop();
+        this.thumpSound.setVolume(THREE.MathUtils.clamp(0.15 + sink * 0.18, 0.15, 0.75) * this.effectsVolumeScale);
+        this.thumpSound.play();
+      }
+    }
+
     if (aircraft.gearRetracted !== this.lastGearRetracted && !mainMenuOpen) {
       this.lastGearRetracted = aircraft.gearRetracted;
       if (this.gearSound && this.gearSound.buffer) {
@@ -258,6 +363,8 @@ export class SoundManager {
       if (this.windSound && this.windSound.isPlaying) this.windSound.stop();
       if (this.alarmSound && this.alarmSound.isPlaying) this.alarmSound.stop();
       if (this.scrapeSound && this.scrapeSound.isPlaying) this.scrapeSound.stop();
+      if (this.buffetSound && this.buffetSound.isPlaying) this.buffetSound.stop();
+      if (this.gpwsSound && this.gpwsSound.isPlaying) this.gpwsSound.stop();
     }
 
     if (aircraft.isCrashed && !this.crashTriggered) {
@@ -272,6 +379,8 @@ export class SoundManager {
       if (this.windSound && this.windSound.isPlaying) this.windSound.stop();
       if (this.alarmSound && this.alarmSound.isPlaying) this.alarmSound.stop();
       if (this.scrapeSound && this.scrapeSound.isPlaying) this.scrapeSound.stop();
+      if (this.buffetSound && this.buffetSound.isPlaying) this.buffetSound.stop();
+      if (this.gpwsSound && this.gpwsSound.isPlaying) this.gpwsSound.stop();
     }
 
     if (!aircraft.isCrashed && !aircraft.isSinking && !mainMenuOpen) {
@@ -284,13 +393,22 @@ export class SoundManager {
     }
   }
 
-  playChimeSound() {
-    if (this.gearSound && this.gearSound.buffer) {
+  // Checkpoint-ring chime. pitch > 1 brightens the final "course complete" ring.
+  playChimeSound(pitch = 1.0) {
+    if (this.chimeSound && this.chimeSound.buffer) {
       const chime = new THREE.Audio(this.listener);
-      chime.setBuffer(this.gearSound.buffer);
+      chime.setBuffer(this.chimeSound.buffer);
       chime.setVolume(0.40 * this.effectsVolumeScale);
-      chime.setPlaybackRate(1.6);
+      chime.setPlaybackRate(pitch);
       chime.play();
+    }
+  }
+
+  playUIClick() {
+    if (this.clickSound && this.clickSound.buffer && !this.isMuted) {
+      if (this.clickSound.isPlaying) this.clickSound.stop();
+      this.clickSound.setVolume(0.30 * this.effectsVolumeScale);
+      this.clickSound.play();
     }
   }
 }

@@ -23,7 +23,12 @@ function buildAudioAssets() {
     { name: 'gear.wav', freq: 0, dur: 1.5, isNoise: false, isGear: true },
     { name: 'flaps.wav', freq: 0, dur: 1.0, isNoise: false, isFlaps: true },
     { name: 'squeal.wav', freq: 0, dur: 0.4, isNoise: false, isSqueal: true },
-    { name: 'afterburner.wav', freq: 0, dur: 1.5, isNoise: true, isAfterburner: true }
+    { name: 'afterburner.wav', freq: 0, dur: 1.5, isNoise: true, isAfterburner: true },
+    { name: 'chime.wav', freq: 880, dur: 0.7, isNoise: false, isChime: true },
+    { name: 'click.wav', freq: 1400, dur: 0.06, isNoise: false, isClick: true },
+    { name: 'thump.wav', freq: 55, dur: 0.4, isNoise: false, isThump: true },
+    { name: 'buffet.wav', freq: 0, dur: 1.6, isNoise: true, isBuffet: true },
+    { name: 'gpws.wav', freq: 0, dur: 1.1, isNoise: false, isGpws: true }
   ];
 
   requiredSounds.forEach((sound) => {
@@ -98,11 +103,43 @@ function generateSoundFile(filePath, sound) {
       const roar = (Math.random() * 2.0 - 1.0) * 0.28;
       const crackle = Math.random() > 0.985 ? (Math.random() * 2.0 - 1.0) * 0.35 : 0.0;
       sample = (roar + crackle) * 32767;
+    } else if (sound.isChime) {
+      // Ring checkpoint: two-tone bell (fundamental + fifth) with a fast decay.
+      const decay = Math.exp(-5.0 * t);
+      const tone1 = Math.sin(2.0 * Math.PI * sound.freq * t);
+      const tone2 = Math.sin(2.0 * Math.PI * sound.freq * 1.5 * t) * 0.6;
+      const shimmer = Math.sin(2.0 * Math.PI * sound.freq * 2.0 * t) * 0.25;
+      sample = (tone1 + tone2 + shimmer) * 0.18 * decay * 32767;
+    } else if (sound.isClick) {
+      // UI click: a very short damped tick.
+      const decay = Math.exp(-90.0 * t);
+      sample = Math.sin(2.0 * Math.PI * sound.freq * t) * 0.22 * decay * 32767;
+    } else if (sound.isThump) {
+      // Touchdown thump: pitch-dropping low sine plus a burst of crunch.
+      const decay = Math.exp(-9.0 * t);
+      const fallingFreq = sound.freq * (1.0 - 0.5 * Math.min(t * 4.0, 1.0));
+      const body = Math.sin(2.0 * Math.PI * fallingFreq * t);
+      const crunch = (Math.random() * 2.0 - 1.0) * 0.30 * Math.exp(-25.0 * t);
+      sample = (body * 0.5 + crunch) * decay * 32767;
+    } else if (sound.isGpws) {
+      // GPWS "whoop whoop": two rising 400->800 Hz sweeps.
+      const cycle = t % 0.55;
+      if (cycle < 0.45) {
+        const sweep = 400 + (800 - 400) * (cycle / 0.45);
+        sample = Math.sin(2.0 * Math.PI * sweep * cycle) * 0.20 * 32767;
+      }
     } else if (sound.isBeep) {
       const isBeepOn = Math.floor(t * 5.0) % 2 === 0;
       sample = isBeepOn ? Math.sin(2.0 * Math.PI * sound.freq * t) * 0.15 * 32767 : 0;
     } else if (sound.isNoise) {
-      if (sound.isSplash) {
+      if (sound.isBuffet) {
+        // Pre-stall buffet loop: low rumble with an irregular 8-14 Hz beat, the
+        // separated flow slamming the tail. Loops cleanly (envelope is periodic).
+        const beat = 0.55 + 0.45 * Math.sin(2.0 * Math.PI * (10.0 + 3.0 * Math.sin(2.0 * Math.PI * t / sound.dur)) * t);
+        const rumble = (Math.random() * 2.0 - 1.0) * 0.22;
+        const lowBody = Math.sin(2.0 * Math.PI * 38 * t) * 0.10;
+        sample = (rumble + lowBody) * beat * 32767;
+      } else if (sound.isSplash) {
         const decay = Math.exp(-4.5 * t);
         sample = (Math.random() * 2.0 - 1.0) * 0.30 * decay * 32767;
       } else if (sound.isCrash) {

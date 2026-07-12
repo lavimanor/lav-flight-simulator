@@ -99,6 +99,10 @@ export class HudManager {
     this.touchdownRate = document.getElementById('hud-touchdown-rate');
     this.lastTouchdownShown = 0;
 
+    // Bottom-right aircraft / weather identity chip
+    this.aircraftNameEl = document.getElementById('hud-aircraft-name');
+    this.weatherNameEl = document.getElementById('hud-weather-name');
+
     this.generateProceduralPitchLadder();
     this.generateHeadingTape();
 
@@ -176,6 +180,16 @@ export class HudManager {
         if (!this.aircraftManager || !this.aircraftManager.activeAircraft) return;
 
         const aircraft = this.aircraftManager.activeAircraft;
+
+        // Identity chip: current airframe and weather preset (cheap to set, so
+        // only touch the DOM when the value actually changes).
+        if (this.aircraftNameEl && this.aircraftNameEl.textContent !== aircraft.config.name) {
+          this.aircraftNameEl.textContent = aircraft.config.name;
+        }
+        const weather = this.engine.moduleManager.get('Weather');
+        if (this.weatherNameEl && weather && this.weatherNameEl.textContent !== weather.activeWeatherId.toUpperCase()) {
+          this.weatherNameEl.textContent = weather.activeWeatherId.toUpperCase();
+        }
 
         // Convert units to standard aviation units using Indicated Airspeed (IAS)
         const speedKnots = Math.round(aircraft.indicatedAirspeed * 1.94384);

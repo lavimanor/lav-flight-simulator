@@ -65,6 +65,20 @@ export class InputManager {
       const panel = document.getElementById('hud-help-panel');
       if (panel) panel.classList.toggle('hidden');
     }
+
+    // Escape backs out of whatever modal is on top: settings, hangar, help card.
+    if (e.code === 'Escape') {
+      const settings = this.engine ? this.engine.moduleManager.get('Settings') : null;
+      const menu = this.engine ? this.engine.moduleManager.get('Menu') : null;
+      const help = document.getElementById('hud-help-panel');
+      if (settings && settings.isOpen) {
+        settings.closeSettings();
+      } else if (menu && menu.isOpen) {
+        menu.closeMenu();
+      } else if (help && !help.classList.contains('hidden')) {
+        help.classList.add('hidden');
+      }
+    }
   }
 
   handleKeyUp(e) {

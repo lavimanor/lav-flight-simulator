@@ -78,6 +78,31 @@ export class RingCourseManager {
     this.hudEl.style.color = this.passedCount === this.rings.length ? '#ffd700' : '#00ff66';
   }
 
+  // Audio + toast feedback the moment a ring is threaded. The final ring gets
+  // a brighter chime and the big COURSE COMPLETE banner (styled in main.css).
+  celebrateRing() {
+    const done = this.passedCount === this.rings.length;
+    const soundManager = this.engine.moduleManager.get('Sound');
+    if (soundManager) soundManager.playChimeSound(done ? 1.35 : 1.0);
+
+    let alertEl = document.getElementById('hud-ring-clear-alert');
+    if (!alertEl) {
+      alertEl = document.createElement('div');
+      alertEl.id = 'hud-ring-clear-alert';
+      document.body.appendChild(alertEl);
+    }
+    alertEl.textContent = done
+      ? '★ COURSE COMPLETE ★'
+      : `RING ${this.passedCount} / ${this.rings.length}`;
+    alertEl.classList.remove('fade-out');
+    // Restart the pulse animation on back-to-back rings.
+    alertEl.style.animation = 'none';
+    void alertEl.offsetWidth;
+    alertEl.style.animation = '';
+    clearTimeout(this.alertTimer);
+    this.alertTimer = setTimeout(() => alertEl.classList.add('fade-out'), done ? 3200 : 1400);
+  }
+
   update(deltaTime) {
     if (!this.aircraftManager) {
       this.aircraftManager = this.engine.moduleManager.get('Aircraft');
@@ -111,6 +136,7 @@ export class RingCourseManager {
             ring.mesh.material.color.setHex(0x00ff66);
             this.passedCount += 1;
             this.updateHud();
+            this.celebrateRing();
             console.log(`[RingCourseManager] Ring scored (${this.passedCount}/${this.rings.length})`);
           }
         }

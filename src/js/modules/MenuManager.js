@@ -182,7 +182,7 @@ export class MenuManager {
     const configs = this.aircraftManager ? this.aircraftManager.configs : {};
 
     // Hangar order: light trainers first, heavies last. Unknown ids append at the end.
-    const preferredOrder = ['trainer', 'stunt', 'warbird', 'fighter', 'f16', 'f22', 'f35', 'attack', 'sr71', 'b2', 'kc135', 'b52', 'cargo', 'debug'];
+    const preferredOrder = ['trainer', 'stunt', 'glider', 'warbird', 'fighter', 'f14', 'f16', 'f22', 'f35', 'attack', 'sr71', 'b2', 'concorde', 'kc135', 'b52', 'cargo', 'debug'];
     const ids = Object.keys(configs).sort((a, b) => {
       const ia = preferredOrder.indexOf(a), ib = preferredOrder.indexOf(b);
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
