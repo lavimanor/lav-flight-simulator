@@ -68,6 +68,14 @@ export class AircraftMeshBuilder {
       this.buildConcorde(aircraft);
     } else if (aircraft.config.id === 'glider') {
       this.buildGlider(aircraft);
+    } else if (aircraft.config.id === 'airliner') {
+      this.buildAirliner(aircraft);
+    } else if (aircraft.config.id === 'biplane') {
+      this.buildBiplane(aircraft);
+    } else if (aircraft.config.id === 'bushplane') {
+      this.buildBushplane(aircraft);
+    } else if (aircraft.config.id === 'bizjet') {
+      this.buildBizjet(aircraft);
     } else if (aircraft.config.id === 'debug') {
       this.buildDebug(aircraft);
     } else {
@@ -2031,6 +2039,488 @@ export class AircraftMeshBuilder {
     aircraft.group.add(greenNav);
 
     this.configureShadows(aircraft.group);
+  }
+
+  // 737-class narrow-body airliner: white tube fuselage, low swept wing with
+  // blended winglets, two podded turbofans under the wing, swept tail.
+  // Built near true meters; the calibration pass in build() trues it to config.
+  static buildAirliner(aircraft) {
+    const fuseMat = new THREE.MeshStandardMaterial({ color: 0xf2f4f5, roughness: 0.35, metalness: 0.25 });
+    const bellyMat = new THREE.MeshStandardMaterial({ color: 0xb7bfc4, roughness: 0.45, metalness: 0.3 });
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0xcfd6da, roughness: 0.45, metalness: 0.3 });
+    const accentMat = new THREE.MeshStandardMaterial({ color: 0x1552a3, roughness: 0.4, metalness: 0.3 });
+    const podMat = new THREE.MeshStandardMaterial({ color: 0x8b959c, roughness: 0.35, metalness: 0.55 });
+    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x10151c, roughness: 0.1, metalness: 0.9 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x757575, roughness: 0.2, metalness: 0.8 });
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+    const g = aircraft.group;
+
+    // Fuselage tube with a rounded nose and an up-swept tail cone.
+    const fuseGeo = new THREE.CylinderGeometry(1.85, 1.75, 28.0, 16);
+    fuseGeo.rotateX(Math.PI / 2);
+    g.add(new THREE.Mesh(fuseGeo, fuseMat));
+    const noseGeo = new THREE.SphereGeometry(1.85, 16, 16);
+    noseGeo.scale(1, 0.95, 1.5);
+    const nose = new THREE.Mesh(noseGeo, fuseMat);
+    nose.position.set(0, 0, 14.0);
+    g.add(nose);
+    const tailGeo = new THREE.ConeGeometry(1.75, 7.0, 14);
+    tailGeo.rotateX(-Math.PI / 2); // apex aft
+    const tailCone = new THREE.Mesh(tailGeo, fuseMat);
+    tailCone.position.set(0, 0.55, -17.4);
+    tailCone.rotation.x = -0.08;
+    g.add(tailCone);
+
+    // Belly stripe (two-tone livery) and cockpit windows.
+    const bellyGeo = new THREE.CylinderGeometry(1.87, 1.77, 26.0, 16, 1, false, Math.PI * 0.60, Math.PI * 0.80);
+    bellyGeo.rotateX(Math.PI / 2);
+    g.add(new THREE.Mesh(bellyGeo, bellyMat));
+    const cockpitGeo = new THREE.BoxGeometry(2.3, 0.7, 1.5);
+    const cockpit = new THREE.Mesh(cockpitGeo, canopyMat);
+    cockpit.position.set(0, 1.0, 12.6);
+    g.add(cockpit);
+
+    // Low swept wing (~25 deg), inboard edge on the centreline, tips aft.
+    const sweep = 0.44;
+    for (const side of [1, -1]) {
+      const wGeo = new THREE.BoxGeometry(17.2, 0.38, 4.9);
+      wGeo.translate(side * 8.6, 0, 0);
+      const w = new THREE.Mesh(wGeo, wingMat);
+      w.position.set(0, -1.15, 1.6);
+      w.rotation.y = side * sweep;
+      w.rotation.z = side * 0.10; // pronounced airliner dihedral
+      g.add(w);
+      // Blended winglet standing up from the tip.
+      const tipX = side * 17.2 * Math.cos(sweep);
+      const tipZ = 1.6 - 17.2 * Math.sin(sweep);
+      const wingletGeo = new THREE.BoxGeometry(0.10, 2.4, 1.3);
+      wingletGeo.translate(0, 1.2, 0);
+      const winglet = new THREE.Mesh(wingletGeo, accentMat);
+      winglet.position.set(tipX, -1.15 + Math.abs(tipX) * 0.10, tipZ);
+      winglet.rotation.z = -side * 0.25; // cant outboard
+      g.add(winglet);
+    }
+
+    // Two podded turbofans slung ahead of and below the wing.
+    const podGeo = new THREE.CylinderGeometry(1.05, 0.9, 4.2, 14);
+    podGeo.rotateX(Math.PI / 2);
+    const pylonGeo = new THREE.BoxGeometry(0.28, 0.9, 2.6);
+    for (const x of [-5.9, 5.9]) {
+      const podZ = 3.4;
+      const pod = new THREE.Mesh(podGeo, podMat);
+      pod.position.set(x, -2.15, podZ);
+      g.add(pod);
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(1.02, 0.10, 8, 18), metalMat);
+      lip.position.set(x, -2.15, podZ + 2.1);
+      g.add(lip);
+      const pylon = new THREE.Mesh(pylonGeo, wingMat);
+      pylon.position.set(x, -1.45, podZ - 0.6);
+      g.add(pylon);
+    }
+
+    // Swept fin with the airline accent, and swept low stabilizers.
+    const finGeo = new THREE.BoxGeometry(0.32, 6.8, 4.2);
+    finGeo.translate(0, 3.4, 0);
+    const fin = new THREE.Mesh(finGeo, accentMat);
+    fin.position.set(0, 1.3, -15.6);
+    fin.rotation.x = 0.38; // rake the tip aft
+    g.add(fin);
+    for (const side of [1, -1]) {
+      const sGeo = new THREE.BoxGeometry(6.6, 0.24, 2.8);
+      sGeo.translate(side * 3.3, 0, 0);
+      const s = new THREE.Mesh(sGeo, wingMat);
+      s.position.set(0, 0.7, -16.6);
+      s.rotation.y = side * 0.42;
+      s.rotation.z = side * 0.06;
+      g.add(s);
+    }
+
+    // Tricycle gear: nose strut + twin-wheel main bogies under the wing root.
+    const strutGeo = new THREE.CylinderGeometry(0.14, 0.14, 1.9, 8);
+    const tireGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.4, 12);
+    tireGeo.rotateZ(Math.PI / 2);
+    const addGear = (x, z) => {
+      const strut = new THREE.Mesh(strutGeo, metalMat);
+      strut.position.set(x, -2.0, z);
+      aircraft.gearGroup.add(strut);
+      for (const dx of [-0.34, 0.34]) {
+        const wheel = new THREE.Mesh(tireGeo, tireMat);
+        wheel.position.set(x + dx, -2.9, z);
+        aircraft.gearGroup.add(wheel);
+      }
+    };
+    addGear(0, 11.5);
+    addGear(-2.9, -0.4);
+    addGear(2.9, -0.4);
+
+    // Nav lights: red on the port (+X) tip, green on starboard (-X).
+    const navGeo = new THREE.SphereGeometry(0.22, 8, 8);
+    const tipZNav = 1.6 - 17.2 * Math.sin(sweep);
+    const redNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0xff2222 }));
+    redNav.position.set(17.2 * Math.cos(sweep), 0.4, tipZNav);
+    g.add(redNav);
+    const greenNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0x22ff22 }));
+    greenNav.position.set(-17.2 * Math.cos(sweep), 0.4, tipZNav);
+    g.add(greenNav);
+
+    this.configureShadows(g);
+  }
+
+  // PT-17 Stearman: yellow two-bay biplane with a blue fuselage, radial cowl,
+  // N-struts and cabane struts, tandem open cockpits and fixed taildragger
+  // gear. Built near true meters; the calibration pass trues it to config.
+  static buildBiplane(aircraft) {
+    const fuseMat = new THREE.MeshStandardMaterial({ color: 0x1a3f8f, roughness: 0.5 });
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0xf5c518, roughness: 0.55 });
+    const tailMat = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.5 });
+    const cowlMat = new THREE.MeshStandardMaterial({ color: 0x2b2f33, roughness: 0.3, metalness: 0.6 });
+    const propMat = new THREE.MeshStandardMaterial({ color: 0x6d4c2f, roughness: 0.6 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x757575, roughness: 0.2, metalness: 0.8 });
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+    const g = aircraft.group;
+
+    // Slab-sided fuselage tapering to the tail post.
+    const fuseGeo = new THREE.CylinderGeometry(0.52, 0.22, 5.6, 10);
+    fuseGeo.rotateX(Math.PI / 2); // wide end forward
+    const fuselage = new THREE.Mesh(fuseGeo, fuseMat);
+    fuselage.position.z = -0.2;
+    g.add(fuselage);
+
+    // Radial engine cowl ring and crankcase.
+    const cowlGeo = new THREE.CylinderGeometry(0.55, 0.5, 0.7, 14);
+    cowlGeo.rotateX(Math.PI / 2);
+    const cowl = new THREE.Mesh(cowlGeo, cowlMat);
+    cowl.position.z = 2.8;
+    g.add(cowl);
+    // Radial cylinder heads poking around the crankcase.
+    for (let i = 0; i < 7; i++) {
+      const ang = (i / 7) * Math.PI * 2;
+      const jugGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.28, 6);
+      jugGeo.rotateX(Math.PI / 2);
+      const jug = new THREE.Mesh(jugGeo, cowlMat);
+      jug.position.set(Math.cos(ang) * 0.36, Math.sin(ang) * 0.36, 3.05);
+      g.add(jug);
+    }
+
+    // Wooden two-blade propeller.
+    aircraft.propellerGroup = new THREE.Group();
+    aircraft.propellerGroup.position.set(0, 0, 3.3);
+    const bladeGeo = new THREE.BoxGeometry(2.4, 0.16, 0.04);
+    aircraft.propellerGroup.add(new THREE.Mesh(bladeGeo, propMat));
+    g.add(aircraft.propellerGroup);
+
+    // Two wings: upper wing sits high on cabane struts and slightly forward
+    // (positive stagger), lower wing shoulders the fuselage bottom.
+    const span = aircraft.config.dimensions.span; // upper span
+    const upperY = 1.35, lowerY = -0.45;
+    const upperZ = 0.85, lowerZ = 0.35;
+    const upperGeo = new THREE.BoxGeometry(span, 0.11, 1.5);
+    const upper = new THREE.Mesh(upperGeo, wingMat);
+    upper.position.set(0, upperY, upperZ);
+    g.add(upper);
+    const lowerGeo = new THREE.BoxGeometry(span * 0.92, 0.11, 1.4);
+    const lower = new THREE.Mesh(lowerGeo, wingMat);
+    lower.position.set(0, lowerY, lowerZ);
+    g.add(lower);
+
+    // Interplane N-struts out near the tips, cabane struts over the fuselage.
+    const strutBarGeo = new THREE.CylinderGeometry(0.035, 0.035, upperY - lowerY, 6);
+    for (const x of [-span * 0.38, span * 0.38, -0.55, 0.55]) {
+      for (const dz of [-0.35, 0.35]) {
+        const strut = new THREE.Mesh(strutBarGeo, metalMat);
+        strut.position.set(x, (upperY + lowerY) / 2, (upperZ + lowerZ) / 2 + dz);
+        strut.rotation.x = dz > 0 ? -0.14 : 0.14; // lean into the stagger
+        g.add(strut);
+      }
+    }
+
+    // Tandem open cockpits: two dark cutouts with tiny windscreens.
+    for (const z of [0.9, -0.3]) {
+      const pitGeo = new THREE.CylinderGeometry(0.30, 0.30, 0.16, 10);
+      const pit = new THREE.Mesh(pitGeo, cowlMat);
+      pit.position.set(0, 0.48, z);
+      g.add(pit);
+      const shieldGeo = new THREE.BoxGeometry(0.5, 0.22, 0.05);
+      const shield = new THREE.Mesh(shieldGeo, metalMat);
+      shield.position.set(0, 0.62, z + 0.35);
+      shield.rotation.x = -0.35;
+      g.add(shield);
+    }
+
+    // Red empennage: stabilizer, fin and rudder.
+    const stabGeo = new THREE.BoxGeometry(2.9, 0.07, 1.0);
+    const stab = new THREE.Mesh(stabGeo, tailMat);
+    stab.position.set(0, 0.12, -3.0);
+    g.add(stab);
+    const finGeo = new THREE.BoxGeometry(0.07, 1.15, 0.95);
+    finGeo.translate(0, 0.57, 0);
+    const fin = new THREE.Mesh(finGeo, tailMat);
+    fin.position.set(0, 0.18, -3.05);
+    g.add(fin);
+
+    // Fixed taildragger gear: splayed mains under the lower wing, tail skid.
+    const strutGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.0, 8);
+    const tireGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.2, 12);
+    tireGeo.rotateZ(Math.PI / 2);
+    [-1.0, 1.0].forEach((x) => {
+      const strut = new THREE.Mesh(strutGeo, metalMat);
+      strut.position.set(x, -0.85, 1.1);
+      strut.rotation.z = x < 0 ? 0.18 : -0.18;
+      aircraft.gearGroup.add(strut);
+      const wheel = new THREE.Mesh(tireGeo, tireMat);
+      wheel.position.set(x * 1.15, -1.3, 1.1);
+      aircraft.gearGroup.add(wheel);
+    });
+    const tailStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.6, 6), metalMat);
+    tailStrut.position.set(0, -0.35, -3.1);
+    aircraft.gearGroup.add(tailStrut);
+    const tailTireGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.1, 8);
+    tailTireGeo.rotateZ(Math.PI / 2);
+    const tailWheel = new THREE.Mesh(tailTireGeo, tireMat);
+    tailWheel.position.set(0, -0.7, -3.1);
+    aircraft.gearGroup.add(tailWheel);
+
+    // Nav lights on the UPPER wing tips: red port (+X), green starboard (-X).
+    const navGeo = new THREE.SphereGeometry(0.08, 8, 8);
+    const redNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0xff2222 }));
+    redNav.position.set(span / 2, upperY + 0.1, upperZ);
+    g.add(redNav);
+    const greenNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0x22ff22 }));
+    greenNav.position.set(-span / 2, upperY + 0.1, upperZ);
+    g.add(greenNav);
+
+    this.configureShadows(g);
+  }
+
+  // DHC-2 Beaver: a high-wing radial bush plane on a fixed taildragger. Fat
+  // strut-braced wing, big squared tail, a radial cowl and a fat tundra-tyre
+  // main gear. Built near true meters; the calibration pass trues it to config.
+  static buildBushplane(aircraft) {
+    const fuseMat = new THREE.MeshStandardMaterial({ color: 0xb71c1c, roughness: 0.5 });
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.5 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, roughness: 0.5 });
+    const cowlMat = new THREE.MeshStandardMaterial({ color: 0x2b2f33, roughness: 0.3, metalness: 0.6 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x0d1a2b, roughness: 0.1, metalness: 0.85, transparent: true, opacity: 0.8 });
+    const propMat = new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: 0.5 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x757575, roughness: 0.2, metalness: 0.8 });
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.95 });
+    const g = aircraft.group;
+    const span = aircraft.config.dimensions.span;
+
+    // Deep slab-sided fuselage tapering to the tailpost.
+    const fuseGeo = new THREE.CylinderGeometry(0.78, 0.42, 7.4, 14);
+    fuseGeo.rotateX(Math.PI / 2);
+    const fuselage = new THREE.Mesh(fuseGeo, fuseMat);
+    fuselage.position.set(0, 0.1, -0.3);
+    g.add(fuselage);
+
+    // Radial engine cowl with a spinner and a two-blade prop out front.
+    const cowlGeo = new THREE.CylinderGeometry(0.82, 0.72, 0.9, 16);
+    cowlGeo.rotateX(Math.PI / 2);
+    const cowl = new THREE.Mesh(cowlGeo, cowlMat);
+    cowl.position.set(0, 0.1, 3.6);
+    g.add(cowl);
+    const spinnerGeo = new THREE.ConeGeometry(0.28, 0.6, 12);
+    spinnerGeo.rotateX(Math.PI / 2);
+    const spinner = new THREE.Mesh(spinnerGeo, trimMat);
+    spinner.position.set(0, 0.1, 4.2);
+    g.add(spinner);
+    aircraft.propellerGroup = new THREE.Group();
+    aircraft.propellerGroup.position.set(0, 0.1, 4.05);
+    const bladeGeo = new THREE.BoxGeometry(2.9, 0.18, 0.05);
+    aircraft.propellerGroup.add(new THREE.Mesh(bladeGeo, propMat));
+    g.add(aircraft.propellerGroup);
+
+    // High wing sitting on a shallow cabane above the cabin roof, full span.
+    const wingGeo = new THREE.BoxGeometry(span, 0.16, 1.75);
+    const wing = new THREE.Mesh(wingGeo, wingMat);
+    wing.position.set(0, 1.15, 0.35);
+    g.add(wing);
+    // Lift struts: a V from the lower fuselage out to mid-span each side.
+    const strutGeo = new THREE.CylinderGeometry(0.05, 0.05, 2.15, 6);
+    for (const side of [1, -1]) {
+      const strut = new THREE.Mesh(strutGeo, metalMat);
+      strut.position.set(side * (span * 0.24), 0.35, 0.35);
+      strut.rotation.z = side * 0.95;
+      g.add(strut);
+    }
+
+    // Boxy cabin glass: wraparound windscreen and side windows.
+    const wsGeo = new THREE.BoxGeometry(1.2, 0.7, 0.9);
+    const windscreen = new THREE.Mesh(wsGeo, glassMat);
+    windscreen.position.set(0, 0.72, 2.05);
+    g.add(windscreen);
+    const cabinGeo = new THREE.BoxGeometry(1.32, 0.62, 2.2);
+    const cabin = new THREE.Mesh(cabinGeo, glassMat);
+    cabin.position.set(0, 0.66, 0.7);
+    g.add(cabin);
+
+    // Big squared empennage: stabilizer, swept fin and rudder.
+    const stabGeo = new THREE.BoxGeometry(3.9, 0.12, 1.15);
+    const stab = new THREE.Mesh(stabGeo, wingMat);
+    stab.position.set(0, 0.32, -3.35);
+    g.add(stab);
+    const finGeo = new THREE.BoxGeometry(0.12, 1.55, 1.35);
+    finGeo.translate(0, 0.78, 0);
+    const fin = new THREE.Mesh(finGeo, fuseMat);
+    fin.position.set(0, 0.3, -3.35);
+    fin.rotation.x = 0.14;
+    g.add(fin);
+
+    // Fixed taildragger gear: tall sprung mains on fat tyres, plus a tailwheel.
+    const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.15, 8);
+    const tireGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.32, 14);
+    tireGeo.rotateZ(Math.PI / 2);
+    [-1.0, 1.0].forEach((x) => {
+      const leg = new THREE.Mesh(legGeo, metalMat);
+      leg.position.set(x, -0.55, 1.5);
+      leg.rotation.z = x < 0 ? 0.32 : -0.32;
+      aircraft.gearGroup.add(leg);
+      const wheel = new THREE.Mesh(tireGeo, tireMat);
+      wheel.position.set(x * 1.35, -1.1, 1.5);
+      aircraft.gearGroup.add(wheel);
+    });
+    const tailLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), metalMat);
+    tailLeg.position.set(0, -0.15, -3.45);
+    aircraft.gearGroup.add(tailLeg);
+    const tailTireGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.12, 10);
+    tailTireGeo.rotateZ(Math.PI / 2);
+    const tailWheel = new THREE.Mesh(tailTireGeo, tireMat);
+    tailWheel.position.set(0, -0.42, -3.45);
+    aircraft.gearGroup.add(tailWheel);
+
+    // Nav lights: red on the port (+X) tip, green on starboard (-X).
+    const navGeo = new THREE.SphereGeometry(0.12, 8, 8);
+    const redNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0xff2222 }));
+    redNav.position.set(span / 2, 1.15, 0.35);
+    g.add(redNav);
+    const greenNav = new THREE.Mesh(navGeo, new THREE.MeshBasicMaterial({ color: 0x22ff22 }));
+    greenNav.position.set(-span / 2, 1.15, 0.35);
+    g.add(greenNav);
+
+    this.configureShadows(g);
+  }
+
+  // Business jet (Learjet-style): slim fuselage, low swept winglet-tipped wings,
+  // two turbofans podded on the aft fuselage, and a T-tail. Retractable
+  // tricycle gear. Built near true meters; the calibration pass trues it.
+  static buildBizjet(aircraft) {
+    const fuseMat = new THREE.MeshStandardMaterial({ color: 0xf4f6f8, roughness: 0.3, metalness: 0.25 });
+    const accentMat = new THREE.MeshStandardMaterial({ color: 0x0d3b66, roughness: 0.35, metalness: 0.3 });
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0xdfe4e8, roughness: 0.4, metalness: 0.3 });
+    const podMat = new THREE.MeshStandardMaterial({ color: 0x8b959c, roughness: 0.3, metalness: 0.6 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x0b1622, roughness: 0.1, metalness: 0.9 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x757575, roughness: 0.2, metalness: 0.8 });
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+    const g = aircraft.group;
+
+    // Slim fuselage with a pointed nose and an up-swept tail cone.
+    const fuseGeo = new THREE.CylinderGeometry(0.95, 0.85, 13.0, 16);
+    fuseGeo.rotateX(Math.PI / 2);
+    g.add(new THREE.Mesh(fuseGeo, fuseMat));
+    const noseGeo = new THREE.SphereGeometry(0.95, 16, 14);
+    noseGeo.scale(1, 0.95, 1.9);
+    const nose = new THREE.Mesh(noseGeo, fuseMat);
+    nose.position.set(0, 0, 7.0);
+    g.add(nose);
+    const tailGeo = new THREE.ConeGeometry(0.85, 4.4, 14);
+    tailGeo.rotateX(-Math.PI / 2); // apex aft
+    const tailCone = new THREE.Mesh(tailGeo, fuseMat);
+    tailCone.position.set(0, 0.45, -8.1);
+    tailCone.rotation.x = -0.12;
+    g.add(tailCone);
+
+    // Blue cheatline and the cockpit windscreen wrap.
+    const stripeGeo = new THREE.CylinderGeometry(0.97, 0.87, 12.0, 16, 1, false, Math.PI * 0.02, Math.PI * 0.30);
+    stripeGeo.rotateX(Math.PI / 2);
+    const stripe = new THREE.Mesh(stripeGeo, accentMat);
+    stripe.rotation.z = Math.PI;
+    g.add(stripe);
+    const wsGeo = new THREE.SphereGeometry(0.72, 14, 12);
+    wsGeo.scale(1, 0.75, 1.6);
+    const windscreen = new THREE.Mesh(wsGeo, glassMat);
+    windscreen.position.set(0, 0.42, 5.4);
+    g.add(windscreen);
+
+    // Low swept wing (~28 deg), inboard edge on the centreline, tips aft, with
+    // upright winglets. Slight dihedral.
+    const sweep = 0.50;
+    for (const side of [1, -1]) {
+      const wGeo = new THREE.BoxGeometry(7.4, 0.22, 2.5);
+      wGeo.translate(side * 3.7, 0, 0);
+      const w = new THREE.Mesh(wGeo, wingMat);
+      w.position.set(0, -0.55, -0.6);
+      w.rotation.y = side * sweep;
+      w.rotation.z = side * 0.06;
+      g.add(w);
+      const tipX = side * 7.4 * Math.cos(sweep);
+      const tipZ = -0.6 - 7.4 * Math.sin(sweep);
+      const wingletGeo = new THREE.BoxGeometry(0.09, 1.15, 1.0);
+      wingletGeo.translate(0, 0.57, 0);
+      const winglet = new THREE.Mesh(wingletGeo, accentMat);
+      winglet.position.set(tipX, -0.5, tipZ);
+      winglet.rotation.z = -side * 0.18;
+      g.add(winglet);
+      // Nav light at the tip.
+      const nav = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8),
+        new THREE.MeshBasicMaterial({ color: side > 0 ? 0xff2222 : 0x22ff22 }));
+      nav.position.set(tipX, -0.5, tipZ);
+      g.add(nav);
+    }
+
+    // Two turbofans podded on the aft fuselage sides on short pylons.
+    const podGeo = new THREE.CylinderGeometry(0.62, 0.55, 2.9, 14);
+    podGeo.rotateX(Math.PI / 2);
+    const pylonGeo = new THREE.BoxGeometry(0.9, 0.28, 0.9);
+    for (const side of [1, -1]) {
+      const pod = new THREE.Mesh(podGeo, podMat);
+      pod.position.set(side * 1.35, 0.35, -5.2);
+      g.add(pod);
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.08, 8, 16), metalMat);
+      lip.position.set(side * 1.35, 0.35, -3.8);
+      g.add(lip);
+      const pylon = new THREE.Mesh(pylonGeo, fuseMat);
+      pylon.position.set(side * 0.85, 0.35, -5.2);
+      g.add(pylon);
+    }
+
+    // T-tail: a tall swept fin capped by the horizontal stabilizer up top.
+    const finGeo = new THREE.BoxGeometry(0.2, 3.2, 2.4);
+    finGeo.translate(0, 1.6, 0);
+    const fin = new THREE.Mesh(finGeo, accentMat);
+    fin.position.set(0, 0.5, -8.0);
+    fin.rotation.x = 0.42;
+    g.add(fin);
+    for (const side of [1, -1]) {
+      const sGeo = new THREE.BoxGeometry(3.0, 0.16, 1.25);
+      sGeo.translate(side * 1.5, 0, 0);
+      const s = new THREE.Mesh(sGeo, wingMat);
+      s.position.set(0, 3.35, -9.05);
+      s.rotation.y = side * 0.30;
+      g.add(s);
+    }
+
+    // Retractable tricycle gear: nose strut + twin-wheel mains under the wing.
+    const strutGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.15, 8);
+    const tireGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.26, 12);
+    tireGeo.rotateZ(Math.PI / 2);
+    const noseStrut = new THREE.Mesh(strutGeo, metalMat);
+    noseStrut.position.set(0, -0.65, 5.0);
+    aircraft.gearGroup.add(noseStrut);
+    const noseWheel = new THREE.Mesh(tireGeo, tireMat);
+    noseWheel.position.set(0, -1.2, 5.0);
+    aircraft.gearGroup.add(noseWheel);
+    [-0.95, 0.95].forEach((x) => {
+      const strut = new THREE.Mesh(strutGeo, metalMat);
+      strut.position.set(x, -0.65, -1.1);
+      strut.rotation.z = x < 0 ? 0.1 : -0.1;
+      aircraft.gearGroup.add(strut);
+      const wheel = new THREE.Mesh(tireGeo, tireMat);
+      wheel.position.set(x * 1.08, -1.2, -1.1);
+      aircraft.gearGroup.add(wheel);
+    });
+
+    this.configureShadows(g);
   }
 
   static addLerx(group, mat, side, { xRoot, xTip, zRoot, zFront, y = 0.04, thick = 0.06 }) {

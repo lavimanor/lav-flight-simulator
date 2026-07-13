@@ -47,6 +47,7 @@ export class AircraftBase {
     this.engineSpool = 1.0;
     this.airbrakesActive = false;
     this.afterburnerActive = false;
+    this.reverseActive = false;
     this.propellerGroup = null;
     this.gearGroup = null;
     this.afterburnerGroup = null;
@@ -83,6 +84,7 @@ export class AircraftBase {
     this.engineSpool = 1.0;
     this.airbrakesActive = false;
     this.afterburnerActive = false;
+    this.reverseActive = false;
     this.controls.throttle = 0.0;
     this.controls.pitchTrim = 0.0;
     // Clear the input-shaping filters so a respawn doesn't inherit the last

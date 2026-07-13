@@ -111,9 +111,13 @@ for (const config of configs) {
     }
     // A minimal pilot: keep the wings level and hold a ~9 deg climb attitude
     // after rotation instead of hauling the stick back forever.
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(ac.group.quaternion);
+    // Wings-level MUST use the solver's true bank (aircraft.bankDeg), not
+    // world up.x: up.x only reads bank near the runway heading, and once prop
+    // torque turns the aircraft ~90 deg it reads pitch as opposite bank and
+    // the "leveler" steers INTO the spiral (found via the biplane, 2026-07-12).
     const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(ac.group.quaternion);
-    ac.controls.roll = THREE.MathUtils.clamp(up.x * 2.0, -1, 1); // banked left (+x up) -> roll right
+    const bankRad = (ac.bankDeg ?? 0) * (Math.PI / 180);
+    ac.controls.roll = THREE.MathUtils.clamp(-bankRad * 2.5, -1, 1); // + bank = right wing down -> roll left
     const rotate = (ac.stallSpeedTAS ?? 999) * 1.05;
     if (ac.airspeed < rotate && agl < 5) {
       ac.controls.pitch = 0.0;
@@ -239,6 +243,82 @@ console.log('\n[7] Touchdown tolerance: a 2 m/s sink landing is safe');
     ac.controls.brakes = touched;
   });
   check('trainer: gentle touchdown rolls out safely', touched && !a.isCrashed, `touched=${touched} crashed=${a.isCrashed} gs=${a.groundSpeed.toFixed(1)}`);
+}
+
+// --- 8. Taxi turns keep the attitude sane -----------------------------------
+// Regression for the ground-attitude clamp: it used to clamp raw XYZ Euler
+// components, which swap meaning off the runway heading — a taxi turn through
+// ~90 deg flipped the aircraft to >140 deg of bank and crashed it (2026-07-12).
+console.log('\n[8] Taxi turn: steering through 360 deg stays upright');
+{
+  const a = makeAircraft(configs.find((c) => c.id === 'trainer'));
+  spawnOnRunway(a);
+  let maxBank = 0;
+  run(a, 30, (ac) => {
+    ac.controls.throttle = 0.3;
+    ac.controls.yaw = 1.0; // hold a continuous right turn (stays on the field)
+    maxBank = Math.max(maxBank, Math.abs(ac.bankDeg ?? 0));
+  });
+  check(
+    `trainer: taxied full circles upright (max bank ${maxBank.toFixed(1)} deg)`,
+    !a.isCrashed && !a.isSinking && maxBank < 10.0,
+    `crashed=${a.isCrashed} sinking=${a.isSinking} maxBank=${maxBank.toFixed(1)}`
+  );
+}
+
+// --- 9. Thrust reversers shorten the rollout, and stow themselves airborne --
+console.log('\n[9] Thrust reversers: shorten the ground roll, ground-only');
+{
+  // Roll out the airliner from the same touchdown state twice: once with the
+  // reversers stowed, once deployed. Reverse must stop it appreciably sooner.
+  const rollout = (useReverse) => {
+    const a = makeAircraft(configs.find((c) => c.id === 'airliner'));
+    const y = AIRFIELD_Y + (a.config.groundClearanceOffset ?? 1.2);
+    const vTouch = 78;
+    a.position.set(0, y, -1500);
+    a.group.position.copy(a.position);
+    a.velocity.set(0, 0, vTouch);
+    a.airspeed = vTouch;
+    a.gearRetracted = false;
+    const z0 = a.position.z;
+    for (let i = 0; i < 60 * 90; i++) {
+      a.controls.throttle = 0;
+      a.controls.brakes = true;
+      a.reverseActive = useReverse;
+      FlightPhysicsSolver.solve(a, 1 / 60);
+      if (a.isCrashed) break;
+      if (a.groundSpeed < 2.0) return a.position.z - z0;
+    }
+    return Infinity;
+  };
+  const plain = rollout(false);
+  const reversed = rollout(true);
+  check(
+    `airliner: reversers cut the ground roll (${plain.toFixed(0)} m -> ${reversed.toFixed(0)} m)`,
+    Number.isFinite(plain) && Number.isFinite(reversed) && reversed < plain * 0.8,
+    `plain=${plain.toFixed(0)} reversed=${reversed.toFixed(0)}`
+  );
+
+  // A reverser left "deployed" must have zero effect in the air: it auto-stows
+  // at liftoff, so climb performance is identical with the flag forced on.
+  const climb = (forceReverse) => {
+    const a = makeAircraft(configs.find((c) => c.id === 'airliner'));
+    spawnInAir(a, 3000, 150);
+    let maxAlt = 3000;
+    run(a, 20, (ac) => {
+      ac.controls.throttle = 1.0;
+      if (forceReverse) ac.reverseActive = true; // solver must ignore/clear it airborne
+      maxAlt = Math.max(maxAlt, ac.position.y);
+    });
+    return { maxAlt, stowed: a.reverseActive === false };
+  };
+  const off = climb(false);
+  const forced = climb(true);
+  check(
+    'airliner: reversers are inert in flight (auto-stow, climb unchanged)',
+    forced.stowed && Math.abs(forced.maxAlt - off.maxAlt) < 1.0,
+    `stowed=${forced.stowed} dAlt=${(forced.maxAlt - off.maxAlt).toFixed(2)}`
+  );
 }
 
 console.log(failures === 0 ? '\nAll physics tests passed.' : `\n${failures} TEST(S) FAILED.`);

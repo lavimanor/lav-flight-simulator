@@ -3,7 +3,7 @@
 A lightweight flight simulator built using **Electron**, **HTML5/CSS3 (ES Modules)**, and **Three.js**. It features a decoupled, modular architecture and custom procedural asset generation.
 The game is 100% AI generated
 
-**Current version**: 0.1.0v 
+**Current version**: 0.1.3v 
 
 ---
 
@@ -71,8 +71,8 @@ The **Settings Menu** can be accessed from the **Pre-Flight Main Menu** or by cl
 ## Up Next
 | Title | Description | Version |
 |---|---|---|
-| **Plane Addition Modularity** | Making the addition of new aircrafts much easier, using JSON files. also adding 3D models support. | 0.1.1v
-|  **Hardware Architecture** | USB Framework, Device Abstraction, Hardware Manager, Input Settings & Preview UI. | 0.1.2v |
-|  **Micro:Bit Integration** | Data Host Communication, Calibration, Input Mapping. | 0.1.3v |
+|  **More Planes & Better Physics** | Adding more planes, Improving the physics & Flight model and adding Ring Course | 0.1.3v |
+|  **Micro:Bit Integration** | Data Host Communication, Calibration, Input Mapping. | 0.1.4v |
+|  **Polishing & Releasing** | Polishing everything, fixing bugs, and finally, releasing (releasing both the executable and the source) | 1.0.0v |
 
 **More To Come**, Awaiting for your ideas

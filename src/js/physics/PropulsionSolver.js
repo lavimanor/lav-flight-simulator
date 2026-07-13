@@ -5,11 +5,14 @@ export class PropulsionSolver {
     const config = aircraft.config;
     const isJet = config.isJet ?? ['fighter', 'f16', 'f22', 'f35', 'b2'].includes(config.id);
 
-    // Fuel burning loops
+    // Fuel burning loops. A running engine never burns zero: idle keeps the
+    // core turning at ~7% of the max-throttle rate, so parking on the runway
+    // with the engine on still empties the tanks eventually.
     if (aircraft.engineSpool > 0.1 && aircraft.fuel > 0) {
       const afterburnerBurnFactor = aircraft.afterburnerActive ? 4.5 : 1.0;
       const maxBurnRate = isJet ? 2.5 : 0.012; // Jets consume dramatically more fuel
-      const fuelBurn = aircraft.controls.throttle * maxBurnRate * afterburnerBurnFactor * aircraft.engineSpool * dt;
+      const throttleFraction = aircraft.engineOn ? (0.07 + 0.93 * aircraft.controls.throttle) : 0.0;
+      const fuelBurn = throttleFraction * maxBurnRate * afterburnerBurnFactor * aircraft.engineSpool * dt;
       aircraft.fuel = Math.max(aircraft.fuel - fuelBurn, 0);
     }
 

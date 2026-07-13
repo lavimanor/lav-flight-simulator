@@ -12,6 +12,8 @@
   "dragCoefficientZero": 0.014,
   "liftCoefficientMax": 1.5,
   "criticalAoADeg": 14,
+  "oswaldFactor": 0.95,
+  "fixedGear": true,
   "emptyWeight": 520,
   "maxFuelCapacity": 45,
   "isJet": false,

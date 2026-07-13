@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 
 export class BrakeSolver {
-  static solve(aircraft, onGround, dt) {
+  // wowFactor is the weight-on-wheels fraction (1 = full weight on the tires,
+  // 0 = the wing is carrying everything). Friction is proportional to the
+  // normal force, so every term below scales with it.
+  static solve(aircraft, onGround, dt, wowFactor = 1.0) {
     if (!onGround) {
       return 0.0;
     }
@@ -15,7 +18,7 @@ export class BrakeSolver {
       const bellyFrictionCoefficient = 0.90; // Severe friction slowing plane down rapidly
       const normalForceN = config.mass * 9.81;
       const slidingResistanceForce = normalForceN * bellyFrictionCoefficient;
-      decelerationRate = slidingResistanceForce / config.mass;
+      decelerationRate = (slidingResistanceForce / config.mass) * wowFactor;
     } else {
       // Normal landing gear configuration
       aircraft.isBellyScraping = false;
@@ -31,7 +34,7 @@ export class BrakeSolver {
 
       const normalForceN = config.mass * 9.81;
       const groundBrakingForce = normalForceN * rollResistanceCoefficient;
-      decelerationRate = groundBrakingForce / config.mass;
+      decelerationRate = (groundBrakingForce / config.mass) * wowFactor;
     }
 
     return decelerationRate;

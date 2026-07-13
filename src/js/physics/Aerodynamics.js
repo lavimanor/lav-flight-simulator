@@ -49,8 +49,7 @@ export class Aerodynamics {
     return sign * Math.max(decayed, residual * Math.max(0, 1 - over));
   }
 
-  static getDragCoefficient(CL, cd0, aspectRatio) {
-    const oswaldFactor = 0.8;
+  static getDragCoefficient(CL, cd0, aspectRatio, oswaldFactor = 0.8) {
     const dragPolarFactor = 1.0 / (Math.PI * aspectRatio * oswaldFactor);
     return cd0 + dragPolarFactor * CL * CL;
   }

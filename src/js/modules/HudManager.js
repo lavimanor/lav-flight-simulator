@@ -224,7 +224,7 @@ export class HudManager {
         }
         if (this.altitudeVal) this.altitudeVal.textContent = altitudeFeet;
         if (this.headingVal) this.headingVal.textContent = headingString;
-        if (this.throttleVal) this.throttleVal.textContent = `${throttlePercent}%`;
+        if (this.throttleVal) this.throttleVal.textContent = aircraft.reverseActive ? 'REV' : `${throttlePercent}%`;
         if (this.rpmVal) this.rpmVal.textContent = aircraft.rpm;
         
         if (this.vsVal) {
@@ -238,7 +238,10 @@ export class HudManager {
           this.throttleBar.style.width = `${Math.min(throttlePercent, 100)}%`;
           
           // Make throttle bar turn orange/red inside afterburner detent (>100% AB throttle)
-          if (aircraft.afterburnerActive) {
+          if (aircraft.reverseActive) {
+            this.throttleBar.style.backgroundColor = '#4fc3f7';
+            this.throttleBar.style.boxShadow = '0 0 8px #4fc3f7';
+          } else if (aircraft.afterburnerActive) {
             this.throttleBar.style.backgroundColor = '#ff4500';
             this.throttleBar.style.boxShadow = '0 0 8px #ff4500';
           } else {

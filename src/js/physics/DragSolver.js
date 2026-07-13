@@ -33,7 +33,9 @@ export class DragSolver {
 
     // Induced drag polar: Cdi = CL^2 / (pi * AR * e), using the real working CL
     // (including flap lift) so slow dirty flight costs the right amount of thrust.
-    const oswaldFactor = 0.8;
+    // Span efficiency is per-airframe: sailplanes approach the elliptical ideal,
+    // low-AR deltas ride on inefficient vortex lift, most others sit near 0.8.
+    const oswaldFactor = config.oswaldFactor ?? 0.8;
     const dragPolarFactor = 1.0 / (Math.PI * config.aspectRatio * oswaldFactor);
     const inducedDragCD = dragPolarFactor * CL * CL;
 

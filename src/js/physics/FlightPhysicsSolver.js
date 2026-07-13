@@ -63,6 +63,10 @@ export class FlightPhysicsSolver {
     }
 
     const isJet = config.isJet ?? ['fighter', 'f16', 'f22', 'f35', 'b2'].includes(config.id);
+    // Which airframes can reverse: jets with thrust reversers and turboprops
+    // with reversible-pitch (beta) props. Pure piston singles cannot.
+    const isTurbopropEng = !isJet && (config.engineType || '').toLowerCase().includes('turboprop');
+    const hasReverser = config.hasReverser ?? (isJet || isTurbopropEng);
 
     // --- Body axes -----------------------------------------------------------
     const q = aircraft.group.quaternion;
@@ -258,6 +262,10 @@ export class FlightPhysicsSolver {
       // ALONG the heading, while the tires resist sideways skidding much more
       // strongly (cornering grip) so nosewheel steering actually curves the
       // taxi/takeoff path instead of the aircraft sliding like it's on ice.
+      // All of it scales with weight-on-wheels: as the wing picks up the load
+      // near liftoff/touchdown speed the tires carry less, so brakes fade at
+      // high speed and bite progressively during the rollout (like real ones).
+      const wowFactor = THREE.MathUtils.clamp(1.0 - Math.max(liftMagnitude, 0) / weightN, 0.0, 1.0);
       const horizSpeed = Math.hypot(aircraft.velocity.x, aircraft.velocity.z);
       if (horizSpeed > 1e-4) {
         const fwdH = new THREE.Vector3(forward.x, 0, forward.z);
@@ -268,18 +276,30 @@ export class FlightPhysicsSolver {
           const vLat = vHoriz.clone().addScaledVector(fwdH, -vFwd); // sideways skid
 
           // Along-track: rolling resistance + wheel brakes (or belly drag).
-          const decel = BrakeSolver.solve(aircraft, true, dt);
+          let decel = BrakeSolver.solve(aircraft, true, dt, wowFactor);
+
+          // Thrust reversers / reversible-pitch props: redirect the engine's
+          // pull rearward to help decelerate the rollout. It only ever retards
+          // FORWARD motion (never shoves the aircraft backwards), fades out as
+          // the aircraft slows below taxi speed, and needs the engine spooled.
+          if (aircraft.reverseActive && hasReverser && vFwd > 4.0) {
+            const reverseFraction = isJet ? 0.40 : 0.55; // props reverse harder
+            const revDecel = reverseFraction * (config.maxThrust ?? 0)
+              * aircraft.engineSpool / currentMass;
+            decel += revDecel;
+          }
           const newVFwd = Math.sign(vFwd) * Math.max(Math.abs(vFwd) - decel * dt, 0.0);
 
           // Cross-track: bleed the skid off quickly on wheels, slowly on the belly.
-          const lateralGripPerSec = aircraft.gearRetracted ? 1.5 : 7.0;
+          const lateralGripPerSec = (aircraft.gearRetracted ? 1.5 : 7.0)
+            * THREE.MathUtils.clamp(wowFactor * 2.0, 0.25, 1.0);
           vLat.multiplyScalar(Math.max(1.0 - lateralGripPerSec * dt, 0.0));
 
           const newHoriz = fwdH.multiplyScalar(newVFwd).add(vLat);
           aircraft.velocity.x = newHoriz.x;
           aircraft.velocity.z = newHoriz.z;
         } else {
-          const decel = BrakeSolver.solve(aircraft, true, dt);
+          const decel = BrakeSolver.solve(aircraft, true, dt, wowFactor);
           const scale = Math.max(horizSpeed - decel * dt, 0.0) / horizSpeed;
           aircraft.velocity.x *= scale;
           aircraft.velocity.z *= scale;
@@ -288,6 +308,9 @@ export class FlightPhysicsSolver {
       aircraft.isBellyScraping = aircraft.gearRetracted;
     } else {
       aircraft.isBellyScraping = false;
+      // Reversers are a ground-only device: stow them automatically at liftoff
+      // so they can never be left deployed in flight.
+      aircraft.reverseActive = false;
     }
 
     // Soft cap on total speed as a stability guard (drag already limits it).
@@ -572,16 +595,27 @@ export class FlightPhysicsSolver {
 
     // On the ground, keep the attitude sane: wings level, and the nose between a
     // slight nose-down and a safe nose-up limit so the tail can never dig in.
+    // Decompose the attitude from the body axes (yaw/pitch/bank), NOT from the
+    // raw XYZ Euler angles: once the aircraft taxis off the runway heading the
+    // Euler components swap meaning, and clamping them flipped the aircraft
+    // upside-down mid-taxi turn (phantom wingtip-strike crash).
     if (onGround && !aircraft.isSpinning) {
       // Aircraft rotate about the main gear (aft of the CG), so the usable nose-up
       // angle is larger than the raw CG-to-tail geometry implies. Floor it so heavy,
       // long-fuselage types can still rotate to fly, and cap it so the tail is safe.
       const tailStrikeAngle = Math.asin(THREE.MathUtils.clamp(gearHeight / (length * 0.45), 0, 0.9));
       const maxNoseUp = THREE.MathUtils.clamp(tailStrikeAngle * 0.80, 0.14, 0.26); // ~8deg..15deg
-      aircraft.rotation.z = THREE.MathUtils.lerp(aircraft.rotation.z, 0, 10.0 * dt);
-      aircraft.rotation.x = THREE.MathUtils.clamp(aircraft.rotation.x, -maxNoseUp, 0.03);
-      aircraft.group.rotation.copy(aircraft.rotation);
-      aircraft.group.quaternion.setFromEuler(aircraft.group.rotation);
+      const fwdNow = new THREE.Vector3(0, 0, 1).applyQuaternion(aircraft.group.quaternion);
+      const upNow = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraft.group.quaternion);
+      const portNow = new THREE.Vector3(1, 0, 0).applyQuaternion(aircraft.group.quaternion);
+      const yawNow = Math.atan2(fwdNow.x, fwdNow.z);                            // rotateY angle
+      const pitchNow = Math.asin(THREE.MathUtils.clamp(fwdNow.y, -1, 1));       // + = nose up
+      const bankNow = Math.atan2(portNow.y, upNow.y);                           // + = right wing down
+      const pitchClamped = THREE.MathUtils.clamp(pitchNow, -0.03, maxNoseUp);
+      const bankDecayed = THREE.MathUtils.lerp(bankNow, 0, 10.0 * dt);
+      // Recompose yaw -> pitch -> roll. rotateX(+) is nose DOWN, so x = -pitch.
+      aircraft.group.quaternion.setFromEuler(new THREE.Euler(-pitchClamped, yawNow, bankDecayed, 'YXZ'));
+      aircraft.rotation.copy(aircraft.group.rotation);
     }
     aircraft.quaternion.copy(aircraft.group.quaternion);
 

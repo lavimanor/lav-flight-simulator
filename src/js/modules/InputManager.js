@@ -29,12 +29,20 @@ export class InputManager {
       const aircraft = this.aircraftManager ? this.aircraftManager.activeAircraft : null;
       if (aircraft) {
         if (e.code === 'KeyG' && !aircraft.isCrashed) {
-          aircraft.gearRetracted = !aircraft.gearRetracted;
-          console.log(`[InputManager] Gear Retracted: ${aircraft.gearRetracted}`);
+          if (aircraft.config.fixedGear) {
+            console.log('[InputManager] Gear is fixed on this aircraft.');
+          } else {
+            aircraft.gearRetracted = !aircraft.gearRetracted;
+            console.log(`[InputManager] Gear Retracted: ${aircraft.gearRetracted}`);
+          }
         }
         if (e.code === 'KeyF' && !aircraft.isCrashed) {
-          aircraft.flapsStage = (aircraft.flapsStage + 1) % 3;
-          console.log(`[InputManager] Flaps cycled to Stage: ${aircraft.flapsStage}`);
+          if (aircraft.config.hasFlaps === false) {
+            console.log('[InputManager] This aircraft has no flaps.');
+          } else {
+            aircraft.flapsStage = (aircraft.flapsStage + 1) % 3;
+            console.log(`[InputManager] Flaps cycled to Stage: ${aircraft.flapsStage}`);
+          }
         }
         if (e.code === 'KeyI' && !aircraft.isCrashed) {
           if (aircraft.fuel > 0) {
@@ -45,6 +53,18 @@ export class InputManager {
         if (e.code === 'KeyC' && !aircraft.isCrashed) {
           aircraft.airbrakesActive = !aircraft.airbrakesActive;
           console.log(`[InputManager] Airbrakes: ${aircraft.airbrakesActive}`);
+        }
+        if (e.code === 'KeyV' && !aircraft.isCrashed) {
+          const cfg = aircraft.config;
+          const isJet = cfg.isJet ?? ['fighter', 'f16', 'f22', 'f35', 'b2'].includes(cfg.id);
+          const isTurboprop = !isJet && (cfg.engineType || '').toLowerCase().includes('turboprop');
+          const hasReverser = cfg.hasReverser ?? (isJet || isTurboprop);
+          if (hasReverser) {
+            aircraft.reverseActive = !aircraft.reverseActive;
+            console.log(`[InputManager] Thrust reversers: ${aircraft.reverseActive}`);
+          } else {
+            console.log('[InputManager] This aircraft has no thrust reversers.');
+          }
         }
         if (e.code === 'KeyB' && !aircraft.isCrashed) {
           aircraft.controls.brakes = !aircraft.controls.brakes;
@@ -176,15 +196,15 @@ export class InputManager {
       hwThrottleDelta = hwState.throttleDelta;
 
       // Map discrete input toggles
-      if (hwState.gearToggle) {
+      if (hwState.gearToggle && !aircraft.config.fixedGear) {
         aircraft.gearRetracted = !aircraft.gearRetracted;
         console.log(`[InputManager] Gear Retracted toggled via hardware: ${aircraft.gearRetracted}`);
       }
-      if (hwState.flapsDown) {
+      if (hwState.flapsDown && aircraft.config.hasFlaps !== false) {
         aircraft.flapsStage = Math.min(aircraft.flapsStage + 1, 2);
         console.log(`[InputManager] Flaps Extended: ${aircraft.flapsStage}`);
       }
-      if (hwState.flapsUp) {
+      if (hwState.flapsUp && aircraft.config.hasFlaps !== false) {
         aircraft.flapsStage = Math.max(aircraft.flapsStage - 1, 0);
         console.log(`[InputManager] Flaps Retracted: ${aircraft.flapsStage}`);
       }
