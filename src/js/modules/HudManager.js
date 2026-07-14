@@ -432,7 +432,7 @@ export class HudManager {
         }
 
         if (this.crashWarning) {
-          const prompt = this.getUnifiedPrompt('respawn', "'R'");
+          const prompt = this.getUnifiedPrompt('respawn', 'R');
           this.crashWarning.innerHTML = `
             <h2>** CRASHED **</h2>
             <p>PRESS ${prompt} TO RESPAWN ON RUNWAY</p>
@@ -446,8 +446,8 @@ export class HudManager {
 
         // Engine Ignition & Airbrake overlays updates
         if (this.engineWarning) {
-          const prompt = this.getUnifiedPrompt('ignition', "'I'");
-          this.engineWarning.textContent = `ENG SHUTDOWN - PRESS ${prompt} TO IGNITE`;
+          const prompt = this.getUnifiedPrompt('ignition', 'I');
+          this.engineWarning.innerHTML = `ENG SHUTDOWN - PRESS ${prompt} TO IGNITE`;
           if (!aircraft.engineOn && !aircraft.isCrashed) {
             this.engineWarning.classList.remove('hidden');
           } else {
@@ -487,26 +487,36 @@ export class HudManager {
         }
       }
 
-      getUnifiedPrompt(action, defaultKeyboardLabel) {
+      getUnifiedPrompt(action, defaultKeyboardKey) {
     const hw = this.engine.moduleManager.get('Hardware');
     if (!hw || hw.lastInputDevice === 'keyboard') {
-      return defaultKeyboardLabel;
+      // Small keycap chip instead of quoted text like 'R'.
+      const key = String(defaultKeyboardKey).replace(/['"]/g, '');
+      return `<span class="btn-glyph btn-glyph-key">${key}</span>`;
     }
 
-    // Map the button indices to standard controller labels
-    const translateLabel = (btnIndex) => {
-      const labels = {
-        0: 'A', 1: 'B', 2: 'X', 3: 'Y', 4: 'LB', 5: 'RB',
-        6: 'LT', 7: 'RT', 10: 'L3', 11: 'R3', 12: 'D-UP', 13: 'D-DOWN'
-      };
-      return labels[btnIndex] !== undefined ? `(${labels[btnIndex]})` : `(BTN ${btnIndex})`;
+    // Render a small controller-button icon rather than "(A)" style text.
+    // The face buttons keep their conventional colours; shoulder / stick /
+    // D-pad inputs use a neutral pill.
+    const faceButtons = { 0: 'a', 1: 'b', 2: 'x', 3: 'y' };
+    const pillLabels = {
+      4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT',
+      10: 'L3', 11: 'R3', 12: 'D-UP', 13: 'D-DN', 14: 'D-LT', 15: 'D-RT'
+    };
+    const glyph = (btnIndex) => {
+      if (faceButtons[btnIndex] !== undefined) {
+        const cls = faceButtons[btnIndex];
+        return `<span class="btn-glyph btn-glyph-${cls}">${cls.toUpperCase()}</span>`;
+      }
+      const label = pillLabels[btnIndex] ?? `B${btnIndex}`;
+      return `<span class="btn-glyph btn-glyph-pill">${label}</span>`;
     };
 
-    if (action === 'gear') return translateLabel(hw.customBinds.gear);
-    if (action === 'ignition') return translateLabel(hw.customBinds.ignition);
-    if (action === 'respawn') return translateLabel(hw.customBinds.respawn);
-    if (action === 'flaps') return 'D-PAD';
-    
+    if (action === 'gear') return glyph(hw.customBinds.gear);
+    if (action === 'ignition') return glyph(hw.customBinds.ignition);
+    if (action === 'respawn') return glyph(hw.customBinds.respawn);
+    if (action === 'flaps') return '<span class="btn-glyph btn-glyph-pill">D-PAD</span>';
+
     return '';
   }
     }

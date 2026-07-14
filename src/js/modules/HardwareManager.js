@@ -29,6 +29,7 @@ export class HardwareManager {
       flapsUp: false,
       flapsDown: false,
       gearToggle: false,
+      ignitionToggle: false,
       airbrakeToggle: false,
       wheelBrakesToggle: false,
       pauseToggle: false,
@@ -62,6 +63,7 @@ export class HardwareManager {
     this.unifiedState.flapsUp = false;
     this.unifiedState.flapsDown = false;
     this.unifiedState.gearToggle = false;
+    this.unifiedState.ignitionToggle = false;
     this.unifiedState.airbrakeToggle = false;
     this.unifiedState.wheelBrakesToggle = false;
     this.unifiedState.pauseToggle = false;
@@ -88,6 +90,7 @@ export class HardwareManager {
         if (state.flapsUp) this.unifiedState.flapsUp = true;
         if (state.flapsDown) this.unifiedState.flapsDown = true;
         if (state.gearToggle) this.unifiedState.gearToggle = true;
+        if (state.ignitionToggle) this.unifiedState.ignitionToggle = true;
         if (state.airbrakeToggle) this.unifiedState.airbrakeToggle = true;
         if (state.wheelBrakesToggle) this.unifiedState.wheelBrakesToggle = true;
         if (state.pauseToggle) this.unifiedState.pauseToggle = true;
@@ -109,6 +112,7 @@ class GamepadDriver {
       flapsUp: false,
       flapsDown: false,
       gearToggle: false,
+      ignitionToggle: false,
       airbrakeToggle: false,
       wheelBrakesToggle: false,
       pauseToggle: false,
@@ -198,8 +202,9 @@ class GamepadDriver {
     // Command Dispatching driven by the customized mappings object
     const binds = this.hardwareManager.customBinds;
     this.state.gearToggle = isJustPressed(binds.gear);
+    this.state.ignitionToggle = isJustPressed(binds.ignition);
     this.state.respawn = isJustPressed(binds.respawn);
-    
+
     // Dynamic defaults mapped for general features
     this.state.flapsUp = isJustPressed(12);          // D-Pad Up
     this.state.flapsDown = isJustPressed(13);        // D-Pad Down

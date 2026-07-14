@@ -57,17 +57,25 @@ export class MenuManager {
     });
   }
 
+  selectCard(card) {
+    if (!card) return;
+    const id = card.getAttribute('data-id');
+    if (id === this.selectedAircraftId && card.classList.contains('selected')) return;
+    this.cards.forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    this.selectedAircraftId = id;
+    if (this.preview) {
+      this.preview.setAircraft(this.selectedAircraftId);
+    }
+    this.updateSpecsPanel();
+  }
+
   bindCardEvents() {
     this.cards.forEach((card) => {
-      card.addEventListener('click', () => {
-        this.cards.forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        this.selectedAircraftId = card.getAttribute('data-id');
-        if (this.preview) {
-          this.preview.setAircraft(this.selectedAircraftId);
-        }
-        this.updateSpecsPanel();
-      });
+      card.addEventListener('click', () => this.selectCard(card));
+      // Focusing a card (keyboard Tab or controller D-pad) selects it too, so
+      // browsing the fleet updates the 3D preview live without an extra click.
+      card.addEventListener('focus', () => this.selectCard(card));
     });
   }
 

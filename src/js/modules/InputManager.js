@@ -11,6 +11,11 @@ export class InputManager {
     this.focusIndex = 0;
     this.lastTargetSelector = null;
 
+    // Hangar uses two independent cursors: the left stick browses the aircraft
+    // list while the D-pad walks the action buttons (weather / spawn / cancel).
+    this.hangarCardIndex = 0;
+    this.hangarButtonIndex = 0;
+
     // Button edge-detection latches
     this.lastBtn0 = false;
     this.lastBtn1 = false;
@@ -127,6 +132,18 @@ export class InputManager {
     console.log(`[InputManager] Aircraft respawned on runway.`);
   }
 
+  // Focus a menu element and make sure it is scrolled into view. The hangar
+  // aircraft grid scrolls, so a focused card off-screen would otherwise be
+  // invisible to a controller user cycling through the fleet.
+  focusMenuElement(elements, index) {
+    const el = elements[index];
+    if (!el) return;
+    el.focus();
+    if (typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }
+
   // Identifies which overlay is open to parse focused options
   getActiveSelector(settings, hangar, mainMenu) {
     if (settings && settings.isOpen) {
@@ -139,6 +156,68 @@ export class InputManager {
       return '.menu-main-actions button';
     }
     return null;
+  }
+
+  // Hangar controller scheme: the left analog stick browses the aircraft list
+  // (live 3D preview), while the D-pad walks the action buttons (weather +
+  // spawn / settings / cancel). This keeps plane selection separate from the
+  // buttons so the pilot no longer has to scroll the whole list to reach Spawn.
+  updateHangarNavigation(gp, confirmPressed, cancelPressed) {
+    const menu = this.menuManager;
+
+    const cards = (menu.cards || []).filter((el) => el.offsetParent !== null);
+    const buttons = Array.from(document.querySelectorAll(
+      '.weather-btn, #game-menu-settings-btn, #menu-spawn-btn, #menu-close-btn'
+    )).filter((el) => el.offsetParent !== null && !el.disabled);
+
+    // On a fresh open, sync the card cursor to the current selection and park
+    // the button cursor on Spawn so the pilot can launch with a single press.
+    const HANGAR_TOKEN = 'hangar-two-track';
+    if (this.lastTargetSelector !== HANGAR_TOKEN) {
+      this.lastTargetSelector = HANGAR_TOKEN;
+      const selIdx = cards.findIndex((c) => c.getAttribute('data-id') === menu.selectedAircraftId);
+      this.hangarCardIndex = selIdx >= 0 ? selIdx : 0;
+      const spawnIdx = buttons.findIndex((b) => b.id === 'menu-spawn-btn');
+      this.hangarButtonIndex = spawnIdx >= 0 ? spawnIdx : 0;
+      this.focusMenuElement(buttons, this.hangarButtonIndex);
+    }
+
+    // --- Left analog stick: aircraft cards ---
+    const stickUp = gp.axes[1] < -0.5;
+    const stickDown = gp.axes[1] > 0.5;
+    if (this.navCooldown <= 0 && cards.length > 0 && (stickUp || stickDown)) {
+      this.navCooldown = 0.18;
+      this.hangarCardIndex = stickDown
+        ? (this.hangarCardIndex + 1) % cards.length
+        : (this.hangarCardIndex - 1 + cards.length) % cards.length;
+      const card = cards[this.hangarCardIndex];
+      menu.selectCard(card);
+      if (typeof card.scrollIntoView === 'function') {
+        card.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+    }
+
+    // --- D-pad: action buttons ---
+    const dUp = gp.buttons[12]?.pressed || false;
+    const dDown = gp.buttons[13]?.pressed || false;
+    const dLeft = gp.buttons[14]?.pressed || false;
+    const dRight = gp.buttons[15]?.pressed || false;
+    if (this.navCooldown <= 0 && buttons.length > 0 && (dUp || dDown || dLeft || dRight)) {
+      this.navCooldown = 0.20;
+      this.hangarButtonIndex = (dDown || dRight)
+        ? (this.hangarButtonIndex + 1) % buttons.length
+        : (this.hangarButtonIndex - 1 + buttons.length) % buttons.length;
+      this.focusMenuElement(buttons, this.hangarButtonIndex);
+    }
+
+    // A confirms the focused action button (weather pick, spawn, settings…).
+    if (confirmPressed && buttons[this.hangarButtonIndex]) {
+      buttons[this.hangarButtonIndex].click();
+    }
+    // B cancels out of the hangar.
+    if (cancelPressed) {
+      menu.closeMenu();
+    }
   }
 
   update(deltaTime) {
@@ -172,9 +251,17 @@ export class InputManager {
       this.lastBtn0 = btn0;
       this.lastBtn1 = btn1;
 
+      // The hangar has its own two-track scheme; everything else (settings,
+      // main menu) uses the generic single-cursor focus cycling below.
+      if (this.menuManager && this.menuManager.isOpen) {
+        this.updateHangarNavigation(gp, justPressed0, justPressed1);
+        return;
+      }
+
       const selector = this.getActiveSelector(settings, this.menuManager, mainMenu);
       if (selector) {
-        if (selector !== this.lastTargetSelector) {
+        const menuJustOpened = selector !== this.lastTargetSelector;
+        if (menuJustOpened) {
           this.lastTargetSelector = selector;
           this.focusIndex = 0;
         }
@@ -184,7 +271,17 @@ export class InputManager {
         });
 
         if (elements.length > 0) {
+          // Give the freshly opened menu an initial highlight so the controller
+          // user can see what is selected before touching the D-pad, and so the
+          // first press moves rather than being swallowed to "focus item 0".
+          if (menuJustOpened || !elements.includes(document.activeElement)) {
+            this.focusIndex = Math.min(this.focusIndex, elements.length - 1);
+            this.focusMenuElement(elements, this.focusIndex);
+          }
+
           const activeEl = document.activeElement;
+          const isRange = activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'range';
+          const isSelect = activeEl && activeEl.tagName === 'SELECT';
 
           // Standard directional reads
           const dUp = gp.buttons[12]?.pressed || gp.axes[1] < -0.5;
@@ -192,58 +289,47 @@ export class InputManager {
           const dLeft = gp.buttons[14]?.pressed || gp.axes[0] < -0.5;
           const dRight = gp.buttons[15]?.pressed || gp.axes[0] > 0.5;
 
-          // Case 1: Adjust focused slide controls (Sliders)
-          if (activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'range') {
+          // Horizontal presses adjust the focused slider/dropdown in place.
+          // Vertical presses (handled afterwards) always move focus, so the
+          // pilot is never trapped on the first slider.
+          if (this.navCooldown <= 0 && (dLeft || dRight) && isRange) {
             const step = parseFloat(activeEl.step) || 0.05;
             const min = parseFloat(activeEl.min) || 0;
             const max = parseFloat(activeEl.max) || 1;
-            let val = parseFloat(activeEl.value) || 0;
-
-            if (this.navCooldown <= 0 && (dLeft || dRight)) {
-              this.navCooldown = 0.08; // Fast scroll interval for sliders
-              if (dLeft) {
-                activeEl.value = Math.max(min, val - step);
-              } else if (dRight) {
-                activeEl.value = Math.min(max, val + step);
-              }
-              activeEl.dispatchEvent(new Event('input', { bubbles: true }));
-              activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+            const val = parseFloat(activeEl.value) || 0;
+            this.navCooldown = 0.08; // Fast scroll interval for sliders
+            activeEl.value = dLeft ? Math.max(min, val - step) : Math.min(max, val + step);
+            activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+            activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+          } else if (this.navCooldown <= 0 && (dLeft || dRight) && isSelect) {
+            this.navCooldown = 0.20;
+            if (dLeft) {
+              activeEl.selectedIndex = Math.max(0, activeEl.selectedIndex - 1);
+            } else {
+              activeEl.selectedIndex = Math.min(activeEl.options.length - 1, activeEl.selectedIndex + 1);
             }
+            activeEl.dispatchEvent(new Event('change', { bubbles: true }));
           }
 
-          // Case 2: Adjust focused dropdown menus (Select elements)
-          else if (activeEl && activeEl.tagName === 'SELECT') {
-            if (this.navCooldown <= 0 && (dLeft || dRight)) {
-              this.navCooldown = 0.20;
-              if (dLeft) {
-                activeEl.selectedIndex = Math.max(0, activeEl.selectedIndex - 1);
-              } else if (dRight) {
-                activeEl.selectedIndex = Math.min(activeEl.options.length - 1, activeEl.selectedIndex + 1);
-              }
-              activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-          }
+          // Focus cycling. Up/Down always move between rows. Left/Right only
+          // move focus when the current control does not consume them itself.
+          if (this.navCooldown <= 0) {
+            let move = 0;
+            if (dDown) move = 1;
+            else if (dUp) move = -1;
+            else if (dRight && !isRange && !isSelect) move = 1;
+            else if (dLeft && !isRange && !isSelect) move = -1;
 
-          // Standard Focus Cycling
-          if (this.navCooldown <= 0 && (dUp || dDown || dLeft || dRight)) {
-            // Avoid modifying focus on horizontal actions if inside a slider/select
-            const isRange = activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'range';
-            const isSelect = activeEl && activeEl.tagName === 'SELECT';
-            
-            if (!(isRange || isSelect)) {
+            if (move !== 0) {
               this.navCooldown = 0.20;
-              if (dDown || dRight) {
-                this.focusIndex = (this.focusIndex + 1) % elements.length;
-              } else if (dUp || dLeft) {
-                this.focusIndex = (this.focusIndex - 1 + elements.length) % elements.length;
-              }
-              elements[this.focusIndex].focus();
+              this.focusIndex = (this.focusIndex + move + elements.length) % elements.length;
+              this.focusMenuElement(elements, this.focusIndex);
             }
           }
 
           // Edge-triggered click dispatch
           if (justPressed0) {
-            elements[this.focusIndex].focus();
+            this.focusMenuElement(elements, this.focusIndex);
             elements[this.focusIndex].click();
           }
 
@@ -316,6 +402,9 @@ export class InputManager {
 
       if (hwState.gearToggle && !aircraft.config.fixedGear) {
         aircraft.gearRetracted = !aircraft.gearRetracted;
+      }
+      if (hwState.ignitionToggle && aircraft.fuel > 0) {
+        aircraft.engineOn = !aircraft.engineOn;
       }
       if (hwState.flapsDown && aircraft.config.hasFlaps !== false) {
         aircraft.flapsStage = Math.min(aircraft.flapsStage + 1, 2);

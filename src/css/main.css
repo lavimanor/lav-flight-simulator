@@ -1282,16 +1282,80 @@ html, body {
   to   { transform: translateX(-50%) scale(1.0);  opacity: 1; }
 }
 
-/* Controller Navigation Outline Highlights */
-:focus, 
-.aircraft-card:focus, 
-.weather-btn:focus, 
+/* Gamepad Bind Dropdowns
+   The native <option> popup inherits the OS colour scheme, so green text on the
+   default light-grey background was unreadable. Force a dark surface + readable
+   text on both the closed control and the open option list. */
+.bind-selector {
+  background: #0c0f12;
+  color: #00ff66;
+  border: 1.5px solid rgba(0, 255, 102, 0.5);
+  border-radius: 3px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+  min-width: 150px;
+}
+.bind-selector:hover {
+  border-color: #00ff66;
+  background: rgba(0, 255, 102, 0.08);
+}
+.bind-selector:focus {
+  border-color: #00ff66;
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.45);
+}
+.bind-selector option {
+  background: #0c0f12;
+  color: #d6ffe6;
+}
+.bind-selector option:checked {
+  background: #00351a;
+  color: #00ff66;
+}
+
+/* Selected aircraft card: a clear accent bar + corner tick so the current
+   pick is obvious at a glance (previously only a faint border tint). */
+.aircraft-card {
+  position: relative;
+}
+.aircraft-card.selected {
+  border-color: #00ff66;
+  border-left-width: 4px;
+  box-shadow: 0 0 16px rgba(0, 255, 102, 0.28);
+}
+.aircraft-card.selected::after {
+  content: "\2713\00a0SELECTED";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 8px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  color: #0c0f12;
+  background: #00ff66;
+  padding: 2px 6px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* Controller / keyboard Navigation Outline Highlights.
+   Focus (where the D-pad cursor is) reads distinctly from .selected. */
+:focus,
+.aircraft-card:focus,
+.weather-btn:focus,
 .menu-main-actions button:focus,
 .menu-action-row button:focus {
   outline: 2px solid #00ff66;
   outline-offset: 2px;
   background: rgba(0, 255, 102, 0.12) !important;
   box-shadow: 0 0 14px rgba(0, 255, 102, 0.6) !important;
+}
+.bind-selector:focus {
+  outline: 2px solid #00ff66;
+  outline-offset: 2px;
 }
 
 /* Gamepad Live Axis Feedback Widgets */
@@ -1319,4 +1383,49 @@ html, body {
   transform: translateX(-50%);
   box-shadow: 0 0 6px #00ff66;
   transition: width 0.05s ease-out, left 0.05s ease-out;
+}
+
+/* Inline controller / keyboard button icons used in HUD prompts
+   (e.g. "ENG SHUTDOWN - PRESS [A] TO IGNITE"). Replaces the old "(A)" text. */
+.btn-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25em;
+  height: 1.25em;
+  padding: 0 0.25em;
+  margin: 0 0.15em;
+  font-size: 0.9em;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+  color: #fff;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+/* Round face buttons in their conventional Xbox colours. */
+.btn-glyph-a, .btn-glyph-b, .btn-glyph-x, .btn-glyph-y {
+  width: 1.25em;
+  padding: 0;
+  border-radius: 50%;
+}
+.btn-glyph-a { background: #4caf50; }  /* A - green  */
+.btn-glyph-b { background: #e53935; }  /* B - red    */
+.btn-glyph-x { background: #1e88e5; }  /* X - blue   */
+.btn-glyph-y { background: #fdd835; color: #222; text-shadow: none; }  /* Y - yellow */
+/* Shoulder / stick / D-pad inputs as a neutral pill. */
+.btn-glyph-pill {
+  background: #3a4048;
+  font-size: 0.72em;
+  letter-spacing: 0.02em;
+  border-radius: 4px;
+}
+/* Keyboard keycap. */
+.btn-glyph-key {
+  background: #1a1f24;
+  color: #d6ffe6;
+  border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  text-shadow: none;
 }
