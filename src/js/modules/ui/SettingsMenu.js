@@ -49,6 +49,24 @@ export class SettingsMenu {
     this.displays.engine = document.getElementById('val-engine-vol');
     this.displays.wind = document.getElementById('val-wind-vol');
     this.displays.effects = document.getElementById('val-effects-vol');
+    // Controller settings bindings
+    this.sliderDeadzone = document.getElementById('slider-ctrl-deadzone');
+    this.sliderCurve = document.getElementById('slider-ctrl-curve');
+    this.valDeadzone = document.getElementById('val-ctrl-deadzone');
+    this.valCurve = document.getElementById('val-ctrl-curve');
+    
+    this.selectBinds = {
+      gear: document.getElementById('bind-gear'),
+      ignition: document.getElementById('bind-ignition'),
+      respawn: document.getElementById('bind-respawn')
+    };
+
+    // Cache gamepad visualizer nodes
+    this.previewRoll = document.getElementById('preview-axis-roll');
+    this.previewPitch = document.getElementById('preview-axis-pitch');
+    this.previewYaw = document.getElementById('preview-axis-yaw');
+    this.previewThr = document.getElementById('preview-axis-thr');
+    this.previewActiveButtons = document.getElementById('preview-active-buttons');
     this.bindEvents();
     this.loadSavedConfiguration();
   }
@@ -92,6 +110,16 @@ export class SettingsMenu {
         });
       }
     });
+    if (this.sliderDeadzone) {
+      this.sliderDeadzone.addEventListener('input', () => {
+        if (this.valDeadzone) this.valDeadzone.textContent = `${Math.round(this.sliderDeadzone.value * 100)}%`;
+      });
+    }
+    if (this.sliderCurve) {
+      this.sliderCurve.addEventListener('input', () => {
+        if (this.valCurve) this.valCurve.textContent = `${parseFloat(this.sliderCurve.value).toFixed(1)}x`;
+      });
+    }
   }
   openSettings() {
     if (!this.modal) return;
@@ -130,6 +158,24 @@ export class SettingsMenu {
       }
     });
     this.applyVolumesRealtime();
+    const dz = localStorage.getItem('flight_ctrl_deadzone') ?? '0.05';
+    const curve = localStorage.getItem('flight_ctrl_curve') ?? '1.5';
+    if (this.sliderDeadzone) {
+      this.sliderDeadzone.value = dz;
+      if (this.valDeadzone) this.valDeadzone.textContent = `${Math.round(dz * 100)}%`;
+    }
+    if (this.sliderCurve) {
+      this.sliderCurve.value = curve;
+      if (this.valCurve) this.valCurve.textContent = `${parseFloat(curve).toFixed(1)}x`;
+    }
+
+    const savedGear = localStorage.getItem('flight_bind_gear') ?? '2';
+    const savedIgnition = localStorage.getItem('flight_bind_ignition') ?? '3';
+    const savedRespawn = localStorage.getItem('flight_bind_respawn') ?? '0';
+
+    if (this.selectBinds.gear) this.selectBinds.gear.value = savedGear;
+    if (this.selectBinds.ignition) this.selectBinds.ignition.value = savedIgnition;
+    if (this.selectBinds.respawn) this.selectBinds.respawn.value = savedRespawn;
   }
   saveConfiguration() {
     localStorage.setItem('flight_vol_master', this.sliders.master.value);
@@ -144,6 +190,17 @@ export class SettingsMenu {
     this.applyVolumesRealtime();
     this.closeSettings();
     console.log(`[SettingsMenu] Saved audio configuration parameters successfully.`);
+    localStorage.setItem('flight_ctrl_deadzone', this.sliderDeadzone.value);
+    localStorage.setItem('flight_ctrl_curve', this.sliderCurve.value);
+    localStorage.setItem('flight_bind_gear', this.selectBinds.gear.value);
+    localStorage.setItem('flight_bind_ignition', this.selectBinds.ignition.value);
+    localStorage.setItem('flight_bind_respawn', this.selectBinds.respawn.value);
+
+    // Sync variables immediately with the running Hardware manager state
+    const hardwareManager = this.engine.moduleManager.get('Hardware');
+    if (hardwareManager) {
+      hardwareManager.loadInputConfiguration();
+    }
   }
   applyVolumesRealtime() {
     const soundManager = this.engine.moduleManager.get('Sound');
@@ -161,5 +218,49 @@ export class SettingsMenu {
     this.enableILS = this.checkboxILS ? this.checkboxILS.checked : true;
   }
   update(deltaTime) {
+    if (!this.isOpen) return;
+
+    // Query running axes and buttons to update the live visual preview container
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let activeGp = null;
+    for (let i = 0; i < gamepads.length; i++) {
+      if (gamepads[i]) { activeGp = gamepads[i]; break; }
+    }
+
+    if (!activeGp) {
+      if (this.previewActiveButtons) {
+        this.previewActiveButtons.textContent = "Connect a gamepad to verify inputs.";
+      }
+      return;
+    }
+
+    // Update progress bar representations
+    const rollPct = (activeGp.axes[0] * 0.5 + 0.5) * 100;
+    const pitchPct = (activeGp.axes[1] * 0.5 + 0.5) * 100;
+    
+    const lt = activeGp.buttons[6] ? activeGp.buttons[6].value : 0;
+    const rt = activeGp.buttons[7] ? activeGp.buttons[7].value : 0;
+    const yawVal = rt - lt;
+    const yawPct = (yawVal * 0.5 + 0.5) * 100;
+
+    const aircraftManager = this.engine.moduleManager.get('Aircraft');
+    const activeAircraft = aircraftManager ? aircraftManager.activeAircraft : null;
+    const currentThrottlePct = activeAircraft ? activeAircraft.controls.throttle * 100 : 0;
+
+    if (this.previewRoll) this.previewRoll.style.width = `${rollPct}%`;
+    if (this.previewPitch) this.previewPitch.style.width = `${pitchPct}%`;
+    if (this.previewYaw) this.previewYaw.style.width = `${yawPct}%`;
+    if (this.previewThr) this.previewThr.style.width = `${Math.min(currentThrottlePct, 100)}%`;
+
+    // Highlight active button inputs
+    const pressed = [];
+    activeGp.buttons.forEach((btn, index) => {
+      if (btn.pressed) pressed.push(index);
+    });
+    if (this.previewActiveButtons) {
+      this.previewActiveButtons.textContent = pressed.length > 0 
+        ? `Active Buttons: ${pressed.join(', ')}` 
+        : 'Active Buttons: None';
+    }
   }
 }

@@ -6,6 +6,15 @@ export class InputManager {
     this.aircraftManager = null;
     this.menuManager = null;
     this.keys = {};
+    
+    this.navCooldown = 0.0;
+    this.focusIndex = 0;
+    this.lastTargetSelector = null;
+
+    // Button edge-detection latches
+    this.lastBtn0 = false;
+    this.lastBtn1 = false;
+
     this.onKeyDown = (e) => this.handleKeyDown(e);
     this.onKeyUp = (e) => this.handleKeyUp(e);
   }
@@ -17,6 +26,11 @@ export class InputManager {
   }
 
   handleKeyDown(e) {
+    const hardwareManager = this.engine.moduleManager.get('Hardware');
+    if (hardwareManager) {
+      hardwareManager.lastInputDevice = 'keyboard';
+    }
+
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift', 'Control', 'Home', 'End'].includes(e.key)) {
       e.preventDefault();
     }
@@ -80,13 +94,11 @@ export class InputManager {
       }
     }
 
-    // Controls reference card (works even in menus / after a crash).
     if (e.code === 'KeyH') {
       const panel = document.getElementById('hud-help-panel');
       if (panel) panel.classList.toggle('hidden');
     }
 
-    // Escape backs out of whatever modal is on top: settings, hangar, help card.
     if (e.code === 'Escape') {
       const settings = this.engine ? this.engine.moduleManager.get('Settings') : null;
       const menu = this.engine ? this.engine.moduleManager.get('Menu') : null;
@@ -115,47 +127,156 @@ export class InputManager {
     console.log(`[InputManager] Aircraft respawned on runway.`);
   }
 
+  // Identifies which overlay is open to parse focused options
+  getActiveSelector(settings, hangar, mainMenu) {
+    if (settings && settings.isOpen) {
+      return '#hud-settings-content input, #hud-settings-content button, #hud-settings-content select';
+    }
+    if (hangar && hangar.isOpen) {
+      return '.aircraft-card, .weather-btn, #game-menu-settings-btn, #menu-spawn-btn, #menu-close-btn';
+    }
+    if (mainMenu && mainMenu.isOpen) {
+      return '.menu-main-actions button';
+    }
+    return null;
+  }
+
   update(deltaTime) {
     if (!this.engine || !this.engine.moduleManager) return;
-    if (!this.aircraftManager) {
-      this.aircraftManager = this.engine.moduleManager.get('Aircraft');
-    }
-    if (!this.menuManager) {
-      this.menuManager = this.engine.moduleManager.get('Menu');
-    }
-    if (!this.aircraftManager || !this.aircraftManager.activeAircraft) return;
+    if (!this.aircraftManager) this.aircraftManager = this.engine.moduleManager.get('Aircraft');
+    if (!this.menuManager) this.menuManager = this.engine.moduleManager.get('Menu');
 
     const aircraft = this.aircraftManager.activeAircraft;
-    
     const mainMenu = this.engine.moduleManager.get('MainMenu');
+    const settings = this.engine.moduleManager.get('Settings');
+
     const mainMenuOpen = mainMenu ? mainMenu.isOpen : false;
+    const isMenuOpen = mainMenuOpen || (this.menuManager && this.menuManager.isOpen) || (settings && settings.isOpen);
 
-    // Reset continuous controls for evaluation
-    aircraft.controls.pitch = 0;
-    aircraft.controls.roll = 0;
-    aircraft.controls.yaw = 0;
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let gp = null;
+    for (let i = 0; i < gamepads.length; i++) {
+      if (gamepads[i]) { gp = gamepads[i]; break; }
+    }
 
-    // Check for hardware module state data
-    const hardwareManager = this.engine.moduleManager.get('Hardware');
-    const hwState = hardwareManager ? hardwareManager.unifiedState : null;
+    if (gp && isMenuOpen) {
+      if (this.navCooldown > 0) {
+        this.navCooldown -= deltaTime;
+      }
 
-    if (mainMenuOpen || (this.menuManager && this.menuManager.isOpen)) {
-      // Toggle menu close from controller menu button if visible
-      if (hwState && hwState.pauseToggle && this.menuManager && this.menuManager.isOpen) {
-        this.menuManager.closeMenu();
+      // Action button edge triggering (single-pulse clicks)
+      const btn0 = gp.buttons[0]?.pressed || false; // Button A (Confirm)
+      const btn1 = gp.buttons[1]?.pressed || false; // Button B (Back / Cancel)
+      const justPressed0 = btn0 && !this.lastBtn0;
+      const justPressed1 = btn1 && !this.lastBtn1;
+      this.lastBtn0 = btn0;
+      this.lastBtn1 = btn1;
+
+      const selector = this.getActiveSelector(settings, this.menuManager, mainMenu);
+      if (selector) {
+        if (selector !== this.lastTargetSelector) {
+          this.lastTargetSelector = selector;
+          this.focusIndex = 0;
+        }
+
+        const elements = Array.from(document.querySelectorAll(selector)).filter((el) => {
+          return el.offsetParent !== null && !el.disabled;
+        });
+
+        if (elements.length > 0) {
+          const activeEl = document.activeElement;
+
+          // Standard directional reads
+          const dUp = gp.buttons[12]?.pressed || gp.axes[1] < -0.5;
+          const dDown = gp.buttons[13]?.pressed || gp.axes[1] > 0.5;
+          const dLeft = gp.buttons[14]?.pressed || gp.axes[0] < -0.5;
+          const dRight = gp.buttons[15]?.pressed || gp.axes[0] > 0.5;
+
+          // Case 1: Adjust focused slide controls (Sliders)
+          if (activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'range') {
+            const step = parseFloat(activeEl.step) || 0.05;
+            const min = parseFloat(activeEl.min) || 0;
+            const max = parseFloat(activeEl.max) || 1;
+            let val = parseFloat(activeEl.value) || 0;
+
+            if (this.navCooldown <= 0 && (dLeft || dRight)) {
+              this.navCooldown = 0.08; // Fast scroll interval for sliders
+              if (dLeft) {
+                activeEl.value = Math.max(min, val - step);
+              } else if (dRight) {
+                activeEl.value = Math.min(max, val + step);
+              }
+              activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+              activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+
+          // Case 2: Adjust focused dropdown menus (Select elements)
+          else if (activeEl && activeEl.tagName === 'SELECT') {
+            if (this.navCooldown <= 0 && (dLeft || dRight)) {
+              this.navCooldown = 0.20;
+              if (dLeft) {
+                activeEl.selectedIndex = Math.max(0, activeEl.selectedIndex - 1);
+              } else if (dRight) {
+                activeEl.selectedIndex = Math.min(activeEl.options.length - 1, activeEl.selectedIndex + 1);
+              }
+              activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+
+          // Standard Focus Cycling
+          if (this.navCooldown <= 0 && (dUp || dDown || dLeft || dRight)) {
+            // Avoid modifying focus on horizontal actions if inside a slider/select
+            const isRange = activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'range';
+            const isSelect = activeEl && activeEl.tagName === 'SELECT';
+            
+            if (!(isRange || isSelect)) {
+              this.navCooldown = 0.20;
+              if (dDown || dRight) {
+                this.focusIndex = (this.focusIndex + 1) % elements.length;
+              } else if (dUp || dLeft) {
+                this.focusIndex = (this.focusIndex - 1 + elements.length) % elements.length;
+              }
+              elements[this.focusIndex].focus();
+            }
+          }
+
+          // Edge-triggered click dispatch
+          if (justPressed0) {
+            elements[this.focusIndex].focus();
+            elements[this.focusIndex].click();
+          }
+
+          // Edge-triggered cancel/back action
+          if (justPressed1) {
+            if (settings && settings.isOpen) {
+              settings.closeSettings();
+            } else if (this.menuManager && this.menuManager.isOpen) {
+              this.menuManager.closeMenu();
+            }
+          }
+        }
       }
       return;
     }
 
+    if (!aircraft) return;
+
+    aircraft.controls.pitch = 0;
+    aircraft.controls.roll = 0;
+    aircraft.controls.yaw = 0;
+
+    const hardwareManager = this.engine.moduleManager.get('Hardware');
+    const hwState = hardwareManager ? hardwareManager.unifiedState : null;
+
     if (aircraft.isCrashed) {
-      // Allow respawn via controller button (A Button)
       if (hwState && hwState.respawn) {
         this.respawnAircraft(aircraft);
       }
       return;
     }
 
-    // 1. Process Keyboard Continuous Axes States
+    // 1. Process Keyboard Continuous States
     let kbPitch = 0.0;
     let kbRoll = 0.0;
     let kbYaw = 0.0;
@@ -168,8 +289,6 @@ export class InputManager {
     if (this.keys['KeyQ']) kbYaw = -1.0;
     if (this.keys['KeyE']) kbYaw = 1.0;
 
-    // Pitch trim: held keys walk the trim setting (End = nose up, Home = nose
-    // down, matching +pitch = nose up); T recentres it instantly.
     const trimRate = 0.30 * deltaTime;
     if (this.keys['End']) {
       aircraft.controls.pitchTrim = Math.min((aircraft.controls.pitchTrim || 0) + trimRate, 0.5);
@@ -183,7 +302,7 @@ export class InputManager {
       if (this.keys['ControlLeft'] || this.keys['ControlRight'] || this.keys['KeyX']) kbThrottleDelta = -1.0;
     }
 
-    // 2. Process Hardware Analog Axes and Single-Pulse States
+    // 2. Process Hardware Controller States
     let hwPitch = 0.0;
     let hwRoll = 0.0;
     let hwYaw = 0.0;
@@ -195,40 +314,32 @@ export class InputManager {
       hwYaw = hwState.yaw;
       hwThrottleDelta = hwState.throttleDelta;
 
-      // Map discrete input toggles
       if (hwState.gearToggle && !aircraft.config.fixedGear) {
         aircraft.gearRetracted = !aircraft.gearRetracted;
-        console.log(`[InputManager] Gear Retracted toggled via hardware: ${aircraft.gearRetracted}`);
       }
       if (hwState.flapsDown && aircraft.config.hasFlaps !== false) {
         aircraft.flapsStage = Math.min(aircraft.flapsStage + 1, 2);
-        console.log(`[InputManager] Flaps Extended: ${aircraft.flapsStage}`);
       }
       if (hwState.flapsUp && aircraft.config.hasFlaps !== false) {
         aircraft.flapsStage = Math.max(aircraft.flapsStage - 1, 0);
-        console.log(`[InputManager] Flaps Retracted: ${aircraft.flapsStage}`);
       }
       if (hwState.airbrakeToggle) {
         aircraft.airbrakesActive = !aircraft.airbrakesActive;
-        console.log(`[InputManager] Airbrakes toggled: ${aircraft.airbrakesActive}`);
       }
       if (hwState.wheelBrakesToggle) {
         aircraft.controls.brakes = !aircraft.controls.brakes;
-        console.log(`[InputManager] Wheel Brakes toggled: ${aircraft.controls.brakes}`);
       }
       if (hwState.pauseToggle && this.menuManager) {
         this.menuManager.openMenu();
-        console.log(`[InputManager] Simulation paused via hardware input.`);
       }
     }
 
-    // 3. Coordinate Inputs (prioritizing active hardware over keyboard)
-    aircraft.controls.pitch = Math.abs(hwPitch) > 0.05 ? hwPitch : kbPitch;
-    aircraft.controls.roll = Math.abs(hwRoll) > 0.05 ? hwRoll : kbRoll;
-    aircraft.controls.yaw = Math.abs(hwYaw) > 0.05 ? hwYaw : kbYaw;
+    aircraft.controls.pitch = Math.abs(hwPitch) > 0.01 ? hwPitch : kbPitch;
+    aircraft.controls.roll = Math.abs(hwRoll) > 0.01 ? hwRoll : kbRoll;
+    aircraft.controls.yaw = Math.abs(hwYaw) > 0.01 ? hwYaw : kbYaw;
 
     let targetThrottleDelta = kbThrottleDelta;
-    if (Math.abs(hwThrottleDelta) > 0.05) {
+    if (Math.abs(hwThrottleDelta) > 0.01) {
       targetThrottleDelta = hwThrottleDelta;
     }
 
@@ -242,12 +353,7 @@ export class InputManager {
         Math.max(aircraft.controls.throttle + targetThrottleDelta * throttleRate, 0.0),
         maxThrottle
       );
-
-      if (hasAfterburner && aircraft.controls.throttle > 1.01) {
-        aircraft.afterburnerActive = true;
-      } else {
-        aircraft.afterburnerActive = false;
-      }
+      aircraft.afterburnerActive = hasAfterburner && aircraft.controls.throttle > 1.01;
     } else {
       aircraft.controls.throttle = Math.max(aircraft.controls.throttle - 2.0 * deltaTime, 0.0);
       aircraft.afterburnerActive = false;

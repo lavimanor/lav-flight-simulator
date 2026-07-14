@@ -198,6 +198,7 @@ export class MenuManager {
       const card = document.createElement('div');
       card.className = `aircraft-card${id === this.selectedAircraftId ? ' selected' : ''}`;
       card.setAttribute('data-id', id);
+      card.setAttribute('tabindex', '0'); // <-- INSERT THIS LINE to enable controller focus
 
       const desc = config.description || `Configured ${config.name} model.`;
       const badge = MenuManager.badgeFor(config);

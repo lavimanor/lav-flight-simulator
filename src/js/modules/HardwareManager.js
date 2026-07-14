@@ -5,7 +5,22 @@ export class HardwareManager {
     this.engine = null;
     this.drivers = [];
     
-    // Unified state represents aggregated values across all active hardware
+    // Tracks current device style to swap key labels dynamically on screen
+    this.lastInputDevice = 'keyboard'; // 'keyboard' | 'gamepad'
+
+    // Stick adjustments loaded from storage or set as safe defaults
+    this.sensitivityConfig = {
+      deadzone: 0.05,
+      curveExponent: 1.5
+    };
+
+    // Mapping indexes on Xbox controller to operational commands
+    this.customBinds = {
+      gear: 2,       // Default Button X
+      ignition: 3,   // Default Button Y
+      respawn: 0     // Default Button A
+    };
+
     this.unifiedState = {
       pitch: 0.0,
       roll: 0.0,
@@ -23,13 +38,20 @@ export class HardwareManager {
 
   init(engine) {
     this.engine = engine;
+    this.loadInputConfiguration();
 
-    // Register primary hardware drivers
-    this.registerDriver(new GamepadDriver());
+    this.registerDriver(new GamepadDriver(this));
     this.registerDriver(new SerialDriver());
 
-    // Initialize all registered drivers
     this.drivers.forEach((driver) => driver.init(engine));
+  }
+
+  loadInputConfiguration() {
+    this.sensitivityConfig.deadzone = parseFloat(localStorage.getItem('flight_ctrl_deadzone') ?? '0.05');
+    this.sensitivityConfig.curveExponent = parseFloat(localStorage.getItem('flight_ctrl_curve') ?? '1.5');
+    this.customBinds.gear = parseInt(localStorage.getItem('flight_bind_gear') ?? '2', 10);
+    this.customBinds.ignition = parseInt(localStorage.getItem('flight_bind_ignition') ?? '3', 10);
+    this.customBinds.respawn = parseInt(localStorage.getItem('flight_bind_respawn') ?? '0', 10);
   }
 
   registerDriver(driver) {
@@ -37,7 +59,6 @@ export class HardwareManager {
   }
 
   update(deltaTime) {
-    // Reset discrete trigger pulses before compiling new frame data
     this.unifiedState.flapsUp = false;
     this.unifiedState.flapsDown = false;
     this.unifiedState.gearToggle = false;
@@ -46,13 +67,11 @@ export class HardwareManager {
     this.unifiedState.pauseToggle = false;
     this.unifiedState.respawn = false;
 
-    // Reset continuous analog axis values
     this.unifiedState.pitch = 0.0;
     this.unifiedState.roll = 0.0;
     this.unifiedState.yaw = 0.0;
     this.unifiedState.throttleDelta = 0.0;
 
-    // Poll drivers and pool inputs
     for (const driver of this.drivers) {
       if (typeof driver.update === 'function') {
         driver.update(deltaTime);
@@ -61,13 +80,11 @@ export class HardwareManager {
       if (driver.isActive()) {
         const state = driver.getState();
 
-        // Standard 5% analog deadzone filtering to avoid stick drift
-        if (Math.abs(state.pitch) > 0.05) this.unifiedState.pitch = state.pitch;
-        if (Math.abs(state.roll) > 0.05) this.unifiedState.roll = state.roll;
-        if (Math.abs(state.yaw) > 0.05) this.unifiedState.yaw = state.yaw;
-        if (Math.abs(state.throttleDelta) > 0.05) this.unifiedState.throttleDelta = state.throttleDelta;
+        if (Math.abs(state.pitch) > 0.01) this.unifiedState.pitch = state.pitch;
+        if (Math.abs(state.roll) > 0.01) this.unifiedState.roll = state.roll;
+        if (Math.abs(state.yaw) > 0.01) this.unifiedState.yaw = state.yaw;
+        if (Math.abs(state.throttleDelta) > 0.01) this.unifiedState.throttleDelta = state.throttleDelta;
 
-        // Combine discrete trigger pulses
         if (state.flapsUp) this.unifiedState.flapsUp = true;
         if (state.flapsDown) this.unifiedState.flapsDown = true;
         if (state.gearToggle) this.unifiedState.gearToggle = true;
@@ -80,12 +97,9 @@ export class HardwareManager {
   }
 }
 
-/**
- * Standard Gamepad API Input Driver (Xbox Controller Mappings)
- */
 class GamepadDriver {
-  constructor() {
-    this.engine = null;
+  constructor(hardwareManager) {
+    this.hardwareManager = hardwareManager;
     this.active = false;
     this.state = {
       pitch: 0.0,
@@ -104,15 +118,11 @@ class GamepadDriver {
   }
 
   init(engine) {
-    this.engine = engine;
-    
     window.addEventListener('gamepadconnected', (e) => {
       console.log(`[GamepadDriver] Controller detected: ${e.gamepad.id}`);
       this.active = true;
     });
-
     window.addEventListener('gamepaddisconnected', (e) => {
-      console.log(`[GamepadDriver] Controller disconnected: ${e.gamepad.id}`);
       this.active = false;
     });
   }
@@ -123,6 +133,17 @@ class GamepadDriver {
 
   getState() {
     return this.state;
+  }
+
+  applyStickMath(rawVal) {
+    const dz = this.hardwareManager.sensitivityConfig.deadzone;
+    const exp = this.hardwareManager.sensitivityConfig.curveExponent;
+    const absVal = Math.abs(rawVal);
+    if (absVal <= dz) return 0.0;
+    
+    // Scale out stick curve progressively above deadzone threshold
+    const normVal = (absVal - dz) / (1.0 - dz);
+    return Math.sign(rawVal) * Math.pow(normVal, exp);
   }
 
   update(deltaTime) {
@@ -142,7 +163,15 @@ class GamepadDriver {
       return;
     }
 
-    // Edge-trigger evaluation helper to prevent multiple action registrations on a single click
+    // Capture hardware stick states to identify active device transitions
+    const rx = gp.axes[0] || 0.0;
+    const ry = gp.axes[1] || 0.0;
+    const anyPressed = gp.buttons.some(b => b.pressed);
+
+    if (Math.abs(rx) > 0.08 || Math.abs(ry) > 0.08 || anyPressed) {
+      this.hardwareManager.lastInputDevice = 'gamepad';
+    }
+
     const isJustPressed = (index) => {
       const button = gp.buttons[index];
       if (!button) return false;
@@ -152,157 +181,40 @@ class GamepadDriver {
       return pressed && !wasPressed;
     };
 
-    // Axes Assignments
-    this.state.roll = gp.axes[0] || 0.0;   // Left Stick X
-    this.state.pitch = gp.axes[1] || 0.0;  // Left Stick Y (Positive axis down, mapping matches aircraft controls)
+    // Calculate sensitivity-corrected analog states
+    this.state.roll = this.applyStickMath(gp.axes[0] || 0.0);
+    this.state.pitch = this.applyStickMath(gp.axes[1] || 0.0);
 
-    // LT (Button 6) & RT (Button 7) act as progressive rudder controls
     const ltVal = gp.buttons[6] ? gp.buttons[6].value : 0.0;
     const rtVal = gp.buttons[7] ? gp.buttons[7].value : 0.0;
-    this.state.yaw = rtVal - ltVal;
+    this.state.yaw = this.applyStickMath(rtVal - ltVal);
 
-    // LB (Button 4) & RB (Button 5) modulate absolute throttle states
     const lbPressed = gp.buttons[4] ? gp.buttons[4].pressed : false;
     const rbPressed = gp.buttons[5] ? gp.buttons[5].pressed : false;
-    
     this.state.throttleDelta = 0.0;
     if (rbPressed) this.state.throttleDelta += 1.0;
     if (lbPressed) this.state.throttleDelta -= 1.0;
 
-    // Trigger Mappings
-    this.state.gearToggle = isJustPressed(2);        // X Button
+    // Command Dispatching driven by the customized mappings object
+    const binds = this.hardwareManager.customBinds;
+    this.state.gearToggle = isJustPressed(binds.gear);
+    this.state.respawn = isJustPressed(binds.respawn);
+    
+    // Dynamic defaults mapped for general features
     this.state.flapsUp = isJustPressed(12);          // D-Pad Up
     this.state.flapsDown = isJustPressed(13);        // D-Pad Down
-    this.state.airbrakeToggle = isJustPressed(10);   // Left Stick Press (L3)
-    this.state.wheelBrakesToggle = isJustPressed(11); // Right Stick Press (R3)
-    this.state.pauseToggle = isJustPressed(9);       // Start / Menu Button
-    
-    // A Button (Button 0) acts as standard respawn key if the aircraft is grounded/crashed
-    this.state.respawn = isJustPressed(0);
+    this.state.airbrakeToggle = isJustPressed(10);   // L3
+    this.state.wheelBrakesToggle = isJustPressed(11); // R3
+    this.state.pauseToggle = isJustPressed(9);       // Start / Menu
   }
 }
 
-/**
- * Extensible Serial / USB Interface Receiver Driver
- * Adapts incoming serial string commands from Electron's IPC channel.
- */
 class SerialDriver {
   constructor() {
-    this.engine = null;
     this.active = false;
-    this.lastSignalTime = 0;
-    this.state = {
-      pitch: 0.0,
-      roll: 0.0,
-      yaw: 0.0,
-      throttleDelta: 0.0,
-      flapsUp: false,
-      flapsDown: false,
-      gearToggle: false,
-      airbrakeToggle: false,
-      wheelBrakesToggle: false,
-      pauseToggle: false,
-      respawn: false
-    };
+    this.state = {};
   }
-
-  init(engine) {
-    this.engine = engine;
-
-    // Bind event handler directly to standard Electron IPC API context exposure
-    if (window.electronAPI && typeof window.electronAPI.receiveHardwareData === 'function') {
-      window.electronAPI.receiveHardwareData((event, rawData) => {
-        this.parseSerialSignal(rawData);
-      });
-    }
-  }
-
-  isActive() {
-    return this.active;
-  }
-
-  getState() {
-    return this.state;
-  }
-
-  /**
-   * Decodes serial streams. Allows straightforward adjustment for various protocols.
-   * Example expected stream format: "P:0.15,R:-0.40,Y:0.00,G:1\n"
-   */
-  parseSerialSignal(dataString) {
-    if (!dataString || typeof dataString !== 'string') return;
-    
-    this.active = true;
-    this.lastSignalTime = performance.now();
-
-    try {
-      // Clear trigger indicators upon receiving fresh payload
-      this.state.gearToggle = false;
-      this.state.flapsUp = false;
-      this.state.flapsDown = false;
-      this.state.airbrakeToggle = false;
-      this.state.wheelBrakesToggle = false;
-      this.state.pauseToggle = false;
-      this.state.respawn = false;
-      this.state.throttleDelta = 0.0;
-
-      const segments = dataString.trim().split(',');
-      
-      segments.forEach((segment) => {
-        const parts = segment.split(':');
-        if (parts.length !== 2) return;
-
-        const command = parts[0].trim().toUpperCase();
-        const value = parseFloat(parts[1].trim());
-
-        switch (command) {
-          case 'P':  // Pitch
-            this.state.pitch = value;
-            break;
-          case 'R':  // Roll
-            this.state.roll = value;
-            break;
-          case 'Y':  // Yaw
-            this.state.yaw = value;
-            break;
-          case 'TD': // Throttle Delta
-            this.state.throttleDelta = value;
-            break;
-          case 'G':  // Landing Gear Toggle
-            if (value === 1) this.state.gearToggle = true;
-            break;
-          case 'FU': // Flaps Up Stage
-            if (value === 1) this.state.flapsUp = true;
-            break;
-          case 'FD': // Flaps Down Stage
-            if (value === 1) this.state.flapsDown = true;
-            break;
-          case 'AB': // Speedbrakes Toggle
-            if (value === 1) this.state.airbrakeToggle = true;
-            break;
-          case 'B':  // Wheel brakes Toggle
-            if (value === 1) this.state.wheelBrakesToggle = true;
-            break;
-          case 'PA': // Pause Menu Toggle
-            if (value === 1) this.state.pauseToggle = true;
-            break;
-          case 'RE': // Respawn Flight State
-            if (value === 1) this.state.respawn = true;
-            break;
-        }
-      });
-    } catch (error) {
-      console.warn('[SerialDriver] Failed to process incoming serial command payload:', error);
-    }
-  }
-
-  update(deltaTime) {
-    // Watchdog check to disconnect the hardware state if data packets cease to arrive
-    if (this.active) {
-      const now = performance.now();
-      if (now - this.lastSignalTime > 3000) {
-        this.active = false;
-      }
-    }
-  }
+  init() {}
+  isActive() { return false; }
+  getState() { return this.state; }
 }

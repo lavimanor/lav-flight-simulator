@@ -87,6 +87,73 @@
           <input type="checkbox" id="checkbox-ils-display" style="width: auto; accent-color: #00ff66;" checked>
         </div>
       </div>
+      <!-- Controller Configurations & Live Preview -->
+      <div class="settings-group" id="settings-controller-group">
+        <h3>Controller Configuration</h3>
+        <div class="setting-row">
+          <label for="slider-ctrl-deadzone">Stick Deadzone</label>
+          <input type="range" id="slider-ctrl-deadzone" min="0" max="0.25" step="0.01" value="0.05">
+          <span id="val-ctrl-deadzone">5%</span>
+        </div>
+        <div class="setting-row">
+          <label for="slider-ctrl-curve">Response Curve</label>
+          <input type="range" id="slider-ctrl-curve" min="1.0" max="3.0" step="0.1" value="1.5">
+          <span id="val-ctrl-curve">1.5x</span>
+        </div>
+
+        <h3>Custom Gamepad Binds</h3>
+        <div class="setting-row">
+          <label for="bind-gear">Toggle Gear</label>
+          <select id="bind-gear" class="bind-selector" style="background:#0c0f12; color:#00ff66; border:1px solid #00ff66; border-radius:2px; font-family:monospace; padding:2px 6px;">
+            <option value="2">Button X (2)</option>
+            <option value="0">Button A (0)</option>
+            <option value="1">Button B (1)</option>
+            <option value="3">Button Y (3)</option>
+            <option value="4">Left Bumper (4)</option>
+            <option value="5">Right Bumper (5)</option>
+            <option value="10">Left Stick Press (10)</option>
+            <option value="11">Right Stick Press (11)</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label for="bind-ignition">Toggle Ignition</label>
+          <select id="bind-ignition" class="bind-selector" style="background:#0c0f12; color:#00ff66; border:1px solid #00ff66; border-radius:2px; font-family:monospace; padding:2px 6px;">
+            <option value="3">Button Y (3)</option>
+            <option value="0">Button A (0)</option>
+            <option value="1">Button B (1)</option>
+            <option value="2">Button X (2)</option>
+            <option value="4">Left Bumper (4)</option>
+            <option value="5">Right Bumper (5)</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label for="bind-respawn">Respawn Key</label>
+          <select id="bind-respawn" class="bind-selector" style="background:#0c0f12; color:#00ff66; border:1px solid #00ff66; border-radius:2px; font-family:monospace; padding:2px 6px;">
+            <option value="0">Button A (0)</option>
+            <option value="1">Button B (1)</option>
+            <option value="2">Button X (2)</option>
+            <option value="3">Button Y (3)</option>
+          </select>
+        </div>
+
+        <!-- Live Feed Visual Preview Console -->
+        <div class="gamepad-preview-container">
+          <h4 style="font-size: 11px; margin-bottom: 8px; color: #00ff66;">Gamepad Hardware Feed</h4>
+          <div style="font-size: 10px; display: grid; grid-template-columns: 80px 1fr; gap: 4px;">
+            <span>Roll Axis:</span>
+            <div class="gamepad-axis-bar"><div id="preview-axis-roll" class="gamepad-axis-fill"></div></div>
+            <span>Pitch Axis:</span>
+            <div class="gamepad-axis-bar"><div id="preview-axis-pitch" class="gamepad-axis-fill"></div></div>
+            <span>Yaw Axis:</span>
+            <div class="gamepad-axis-bar"><div id="preview-axis-yaw" class="gamepad-axis-fill"></div></div>
+            <span>Throttle:</span>
+            <div class="gamepad-axis-bar" style="background: rgba(0,255,102,0.1);"><div id="preview-axis-thr" class="gamepad-axis-fill" style="width: 0%; transform: none;"></div></div>
+          </div>
+          <div id="preview-active-buttons" style="font-size: 10px; margin-top: 6px; border-top: 1px dashed rgba(0,255,102,0.2); padding-top: 6px; color: #a0aec0;">
+            Active Buttons: None
+          </div>
+        </div>
+      </div>
       <div class="menu-action-row">
         <button id="settings-save-btn">SAVE CONFIG</button>
         <button id="settings-close-btn">CANCEL</button>
