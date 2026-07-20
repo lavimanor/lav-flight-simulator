@@ -5,7 +5,7 @@ export class DragSolver {
   // dirty-configuration item contributes its own delta-CD on top of the clean
   // zero-lift drag, and induced drag comes from the same CL the wing is
   // actually producing (passed in from the LiftSolver).
-  static solve(aircraft, airDensity, CL, speedOfSound, relativeHeight, dt, speed) {
+  static solve(aircraft, airDensity, CL, speedOfSound, relativeHeight, dt, speed, sideslipRad = 0) {
     const config = aircraft.config;
     const isJet = config.isJet ?? ['fighter', 'f16', 'f22', 'f35', 'b2'].includes(config.id);
 
@@ -21,10 +21,26 @@ export class DragSolver {
       cd0 += 0.055 * flapEff;
     }
 
-    // Extended landing gear: struts, doors and wheels in the airstream.
-    if (!aircraft.gearRetracted) {
-      cd0 += 0.020;
+    // Extended landing gear: struts, doors and wheels in the airstream. The
+    // legs contribute in proportion to how far out they are, and the transit
+    // itself is the draggiest moment — gear doors and half-swung legs broadside
+    // to the flow — which is why the retraction is felt as a distinct surge.
+    const gearPos = aircraft.gearPosition ?? (aircraft.gearRetracted ? 0.0 : 1.0);
+    cd0 += 0.020 * gearPos + 0.008 * (4.0 * gearPos * (1.0 - gearPos));
+
+    // A stopped or windmilling propeller is a big flat disc of drag that a
+    // running one isn't; an engine-out glide in a prop type is noticeably
+    // worse than a simple power-off one. Jets lose almost nothing. Types with
+    // a feathering/stowing prop (motor gliders) override the penalty in config.
+    if (!isJet) {
+      const propStopDrag = config.propStopDrag ?? 0.016;
+      cd0 += propStopDrag * (1.0 - (aircraft.engineSpool ?? 1.0));
     }
+
+    // Sideslip drag: the fuselage flying sideways-on presents far more frontal
+    // area, which is the whole point of a forward slip on final. Quadratic so
+    // the small beta of a coordinated turn costs nearly nothing.
+    cd0 += 0.60 * sideslipRad * sideslipRad;
 
     // Aerodynamic speedbrakes: deploy/retract with actuator lag.
     const targetAirbrakeDeploy = aircraft.airbrakesActive ? 1.0 : 0.0;

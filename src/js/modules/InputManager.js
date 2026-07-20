@@ -19,6 +19,7 @@ export class InputManager {
     // Button edge-detection latches
     this.lastBtn0 = false;
     this.lastBtn1 = false;
+    this.lastBtn8 = false;
 
     this.onKeyDown = (e) => this.handleKeyDown(e);
     this.onKeyUp = (e) => this.handleKeyUp(e);
@@ -236,6 +237,18 @@ export class InputManager {
     let gp = null;
     for (let i = 0; i < gamepads.length; i++) {
       if (gamepads[i]) { gp = gamepads[i]; break; }
+    }
+
+    // View button (8) toggles the controls-reference panel while flying. This
+    // edge-detection runs whether or not a menu is open so the latch never
+    // goes stale, but the toggle itself only fires in flight.
+    if (gp) {
+      const btn8 = gp.buttons[8]?.pressed || false;
+      if (btn8 && !this.lastBtn8 && !isMenuOpen) {
+        const panel = document.getElementById('hud-help-panel');
+        if (panel) panel.classList.toggle('hidden');
+      }
+      this.lastBtn8 = btn8;
     }
 
     if (gp && isMenuOpen) {

@@ -41,6 +41,7 @@ export class AircraftBase {
     this.isSinking = false;
     this.spinDir = 1;
     this.gearRetracted = false;
+    this.gearPosition = 1.0; // 1 = down and locked, 0 = stowed (animates in transit)
     this.flapsStage = 0;
     this.isBellyScraping = false;
     this.engineOn = true;
@@ -78,6 +79,7 @@ export class AircraftBase {
     this.brakePressure = 0.0;
     this.airbrakeDeployState = 0.0;
     this.gearRetracted = false;
+    this.gearPosition = 1.0;
     this.flapsStage = 0;
     this.controls.brakes = false;
     this.engineOn = true;
@@ -111,7 +113,9 @@ export class AircraftBase {
       });
     }
     if (this.gearGroup) {
-      this.gearGroup.visible = !this.gearRetracted;
+      // The legs stay visible through most of the retraction cycle and only
+      // disappear once they are essentially stowed in the wells.
+      this.gearGroup.visible = (this.gearPosition ?? (this.gearRetracted ? 0 : 1)) > 0.08;
     }
     if (this.afterburnerGroup) {
       this.afterburnerGroup.visible = this.afterburnerActive && (this.engineSpool > 0.8) && (this.fuel > 0);

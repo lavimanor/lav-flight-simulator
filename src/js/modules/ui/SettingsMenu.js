@@ -227,30 +227,56 @@ export class SettingsMenu {
       if (gamepads[i]) { activeGp = gamepads[i]; break; }
     }
 
+    // Helper utility to position bipolar deviations from the center line (50%).
+    // The stylesheet centres the idle fill with translateX(-50%), which must be
+    // cleared here or every deflection renders shifted by half its own width.
+    const updateBipolarBar = (barElement, value) => {
+      if (!barElement) return;
+      barElement.style.transform = 'none';
+      const clamped = Math.max(-1, Math.min(1, value));
+      if (clamped >= 0) {
+        barElement.style.width = `${clamped * 50}%`;
+        barElement.style.left = '50%';
+        barElement.style.right = 'auto';
+      } else {
+        barElement.style.width = `${Math.abs(clamped) * 50}%`;
+        barElement.style.left = 'auto';
+        barElement.style.right = '50%';
+      }
+    };
+
     if (!activeGp) {
       if (this.previewActiveButtons) {
         this.previewActiveButtons.textContent = "Connect a gamepad to verify inputs.";
       }
+      // Park the axis bars at neutral so stale deflections don't linger.
+      updateBipolarBar(this.previewRoll, 0);
+      updateBipolarBar(this.previewPitch, 0);
+      updateBipolarBar(this.previewYaw, 0);
       return;
     }
 
-    // Update progress bar representations
-    const rollPct = (activeGp.axes[0] * 0.5 + 0.5) * 100;
-    const pitchPct = (activeGp.axes[1] * 0.5 + 0.5) * 100;
-    
+    const rollVal = activeGp.axes[0] || 0;
+    const pitchVal = activeGp.axes[1] || 0;
+
     const lt = activeGp.buttons[6] ? activeGp.buttons[6].value : 0;
     const rt = activeGp.buttons[7] ? activeGp.buttons[7].value : 0;
     const yawVal = rt - lt;
-    const yawPct = (yawVal * 0.5 + 0.5) * 100;
 
     const aircraftManager = this.engine.moduleManager.get('Aircraft');
     const activeAircraft = aircraftManager ? aircraftManager.activeAircraft : null;
     const currentThrottlePct = activeAircraft ? activeAircraft.controls.throttle * 100 : 0;
 
-    if (this.previewRoll) this.previewRoll.style.width = `${rollPct}%`;
-    if (this.previewPitch) this.previewPitch.style.width = `${pitchPct}%`;
-    if (this.previewYaw) this.previewYaw.style.width = `${yawPct}%`;
-    if (this.previewThr) this.previewThr.style.width = `${Math.min(currentThrottlePct, 100)}%`;
+    updateBipolarBar(this.previewRoll, rollVal);
+    updateBipolarBar(this.previewPitch, pitchVal);
+    updateBipolarBar(this.previewYaw, yawVal);
+
+    // Throttle bar is uni-directional, filling from left to right (0% to 100%)
+    if (this.previewThr) {
+      this.previewThr.style.width = `${Math.min(currentThrottlePct, 100)}%`;
+      this.previewThr.style.left = '0';
+      this.previewThr.style.right = 'auto';
+    }
 
     // Highlight active button inputs
     const pressed = [];

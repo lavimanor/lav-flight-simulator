@@ -169,6 +169,21 @@ export class FlightPhysicsSolver {
       geLiftMultiplier = 1.0 + 0.20 * (span - heightAboveGround) / span;
     }
 
+    // Landing gear transit: real gear takes seconds to swing through its cycle,
+    // with the doors and half-extended legs hanging in the breeze the whole way.
+    // gearRetracted stays the COMMANDED state (and the ground-contact geometry);
+    // gearPosition is the actual leg position that drag and the HUD see.
+    if (config.fixedGear) {
+      aircraft.gearPosition = 1.0;
+    } else {
+      const gearTarget = aircraft.gearRetracted ? 0.0 : 1.0;
+      const gearTransitTime = config.gearTransitTime ?? 3.0; // seconds full cycle
+      const gearNow = aircraft.gearPosition ?? gearTarget;
+      const step = dt / Math.max(gearTransitTime, 0.1);
+      aircraft.gearPosition = THREE.MathUtils.clamp(
+        gearNow + Math.sign(gearTarget - gearNow) * step, 0.0, 1.0);
+    }
+
     // Flap blowback: above the flap placard speed the airload folds the surfaces'
     // extra lift/drag away, so landing flap at Mach 0.9 does nothing instead of
     // granting full high-lift camber. Shared with the Lift/Drag solvers.
@@ -189,7 +204,7 @@ export class FlightPhysicsSolver {
     // --- Aerodynamic + propulsive forces ------------------------------------
     const thrustMag = PropulsionSolver.solve(aircraft, airDensity, dt);
     const { liftMagnitude, CL } = LiftSolver.solve(aircraft, airDensity, geLiftMultiplier, aoaRad, V, machNumber);
-    const dragMag = DragSolver.solve(aircraft, airDensity, CL, speedOfSound, heightAboveGround, dt, V);
+    const dragMag = DragSolver.solve(aircraft, airDensity, CL, speedOfSound, heightAboveGround, dt, V, sideslipRad);
 
     // Everything except gravity goes into aeroForce first, so the felt load
     // factor (what bends wings and blacks out pilots) can be measured from the
@@ -365,8 +380,15 @@ export class FlightPhysicsSolver {
     }
 
     // --- Stall / spin state --------------------------------------------------
+    // Stall with hysteresis: the flow separates the moment alpha exceeds the
+    // critical angle, but once separated it does not reattach until the nose
+    // comes down through ~85% of it. Without this the wing flickers in and out
+    // of the stall at the boundary and the recovery feels arcade-instant.
     const airborne = heightAboveGround > 2.0;
-    aircraft.isStalled = airborne && Math.abs(aoaRad) > critAoA;
+    const stallExitAoA = 0.85 * critAoA;
+    aircraft.isStalled = airborne && (aircraft.isStalled
+      ? Math.abs(aoaRad) > stallExitAoA
+      : Math.abs(aoaRad) > critAoA);
     const stallFactor = aircraft.isStalled ? 0.35 : 1.0;
 
     // Pre-stall buffet: separated flow starts beating on the airframe a few

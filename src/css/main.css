@@ -1374,13 +1374,28 @@ html, body {
   position: relative;
   width: 100%;
 }
+/* Centre detent marker so bipolar deflections read at a glance */
+.gamepad-axis-bar::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(0, 255, 102, 0.45);
+  pointer-events: none;
+}
+/* Unipolar bars (throttle) fill from the left edge; no centre detent. */
+.gamepad-axis-bar.unipolar::after {
+  display: none;
+}
 .gamepad-axis-fill {
   height: 100%;
   background: #00ff66;
-  width: 50%;
+  width: 0;
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
   box-shadow: 0 0 6px #00ff66;
   transition: width 0.05s ease-out, left 0.05s ease-out;
 }
@@ -1404,16 +1419,40 @@ html, body {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
 }
-/* Round face buttons in their conventional Xbox colours. */
+/* Round face buttons in their conventional Xbox colours: domed, with a gloss
+   highlight up top, a dark seating ring, and a faint colour bloom. */
 .btn-glyph-a, .btn-glyph-b, .btn-glyph-x, .btn-glyph-y {
-  width: 1.25em;
+  width: 1.35em;
+  height: 1.35em;
   padding: 0;
   border-radius: 50%;
+  box-shadow:
+    0 0 0 1.5px rgba(10, 12, 14, 0.85),      /* seating ring in the shell */
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 2px 2px rgba(255, 255, 255, 0.45),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
-.btn-glyph-a { background: #4caf50; }  /* A - green  */
-.btn-glyph-b { background: #e53935; }  /* B - red    */
-.btn-glyph-x { background: #1e88e5; }  /* X - blue   */
-.btn-glyph-y { background: #fdd835; color: #222; text-shadow: none; }  /* Y - yellow */
+.btn-glyph-a {  /* A - green */
+  background: radial-gradient(circle at 35% 28%, #8fe89a, #46b154 55%, #256b2e);
+  box-shadow: 0 0 0 1.5px rgba(10,12,14,0.85), 0 1px 4px rgba(76,175,80,0.45),
+    inset 0 2px 2px rgba(255,255,255,0.45), inset 0 -2px 3px rgba(0,0,0,0.35);
+}
+.btn-glyph-b {  /* B - red */
+  background: radial-gradient(circle at 35% 28%, #ff9d94, #dd3c34 55%, #8e1b17);
+  box-shadow: 0 0 0 1.5px rgba(10,12,14,0.85), 0 1px 4px rgba(229,57,53,0.45),
+    inset 0 2px 2px rgba(255,255,255,0.45), inset 0 -2px 3px rgba(0,0,0,0.35);
+}
+.btn-glyph-x {  /* X - blue */
+  background: radial-gradient(circle at 35% 28%, #8ec4ff, #2277dd 55%, #114a8e);
+  box-shadow: 0 0 0 1.5px rgba(10,12,14,0.85), 0 1px 4px rgba(30,136,229,0.45),
+    inset 0 2px 2px rgba(255,255,255,0.45), inset 0 -2px 3px rgba(0,0,0,0.35);
+}
+.btn-glyph-y {  /* Y - yellow */
+  background: radial-gradient(circle at 35% 28%, #ffeb99, #eebc12 55%, #93700a);
+  box-shadow: 0 0 0 1.5px rgba(10,12,14,0.85), 0 1px 4px rgba(253,216,53,0.45),
+    inset 0 2px 2px rgba(255,255,255,0.45), inset 0 -2px 3px rgba(0,0,0,0.35);
+}
 /* Shoulder / stick / D-pad inputs as a neutral pill. */
 .btn-glyph-pill {
   background: #3a4048;
@@ -1428,4 +1467,121 @@ html, body {
   border-radius: 4px;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
   text-shadow: none;
+}
+
+/* Expanded Help Modal & Column Formatting */
+#hud-help-panel {
+  width: 440px !important;
+  max-width: 90vw;
+  max-height: 84vh;
+  overflow-y: auto;
+  padding: 20px 24px !important;
+}
+#hud-help-panel h3 {
+  border-bottom: 2px solid #00ff66;
+  padding-bottom: 8px;
+  font-size: 14px;
+  text-shadow: 0 0 6px rgba(0,255,102,0.4);
+}
+#hud-help-panel .help-grid-3 {
+  display: grid;
+  grid-template-columns: 160px 110px 1fr;
+  row-gap: 8px;
+  column-gap: 12px;
+  font-size: 11px;
+  align-items: center;
+  margin-top: 14px;
+}
+#hud-help-panel .help-grid-3 span {
+  border-bottom: 1px solid rgba(0, 255, 102, 0.05);
+  padding: 3px 0;
+}
+#hud-help-panel .help-grid-3 .grid-header {
+  font-weight: bold;
+  color: #00ff66;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  border-bottom: 1.5px solid rgba(0, 255, 102, 0.3);
+  padding-bottom: 6px;
+}
+
+/* Controller hardware glyphs, shaped like the parts they stand for. These
+   rules sit after .btn-glyph in the sheet, so they win without !important. */
+
+/* Analog triggers: tall blades with a curved crown that fall away to the rear. */
+.btn-glyph-trigger {
+  height: 1.5em;
+  background: linear-gradient(180deg, #4a515a 0%, #23262b 65%, #16181c 100%);
+  border: 1px solid #5a6068;
+  border-radius: 50% 50% 4px 4px / 38% 38% 4px 4px;
+  padding: 0.1em 0.45em 0;
+  font-size: 0.7em;
+  letter-spacing: 0.03em;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.55),
+    inset 0 2px 2px rgba(255, 255, 255, 0.22),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.45);
+}
+
+/* Bumpers: the wide low arc riding over the trigger. */
+.btn-glyph-bumper {
+  background: linear-gradient(180deg, #7b848e 0%, #4a5058 60%, #363b42 100%);
+  border: 1px solid #8e96a0;
+  border-radius: 10px 10px 3px 3px / 14px 14px 3px 3px;
+  padding: 0 0.55em;
+  font-size: 0.7em;
+  letter-spacing: 0.03em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55),
+    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.35),
+    inset 0 -1.5px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* D-pad directions: an inset rounded key with a glowing arrow. */
+.btn-glyph-dpad {
+  width: 1.35em;
+  height: 1.35em;
+  padding: 0;
+  background: radial-gradient(circle at 50% 42%, #31373f 0%, #23272d 60%, #191c20 100%);
+  border: 1px solid #4a4f56;
+  border-radius: 26%;
+  font-size: 0.82em;
+  color: #00ff66;
+  text-shadow: 0 0 4px rgba(0, 255, 102, 0.6);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.7),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.08),
+    0 1px 1px rgba(255, 255, 255, 0.06);
+}
+
+/* Clickable analog sticks (L3 / R3): the round stick cap seen from above,
+   with its concave thumb dish and outer grip ring. */
+.btn-glyph-stick {
+  width: 1.6em;
+  height: 1.6em;
+  padding: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 32%, #5c646d 0%, #2b3036 55%, #14171b 100%);
+  border: 2px solid #646c75;
+  font-size: 0.62em;
+  letter-spacing: 0.02em;
+  color: #d3dae1;
+  box-shadow: 0 0 0 1.5px rgba(10, 12, 14, 0.85),
+    0 2px 3px rgba(0, 0, 0, 0.6),
+    inset 0 3px 4px rgba(0, 0, 0, 0.5),
+    inset 0 -1.5px 2px rgba(255, 255, 255, 0.14);
+}
+
+/* System buttons (VIEW / MENU): the small round buttons beside the guide. */
+.btn-glyph-sys {
+  width: 1.35em;
+  height: 1.35em;
+  padding: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 30%, #454c55 0%, #2a2e34 60%, #191c20 100%);
+  border: 1px solid #5a6068;
+  font-size: 0.95em;
+  font-weight: 400;
+  color: #e2e8ee;
+  box-shadow: 0 0 0 1.5px rgba(10, 12, 14, 0.85),
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.25),
+    inset 0 -1.5px 2px rgba(0, 0, 0, 0.4);
 }

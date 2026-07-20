@@ -405,8 +405,15 @@ export class HudManager {
 
         // Takeoff / Landing configurations displays
         if (this.gearVal) {
-          this.gearVal.textContent = aircraft.gearRetracted ? 'UP' : 'DN';
-          this.gearVal.style.color = aircraft.gearRetracted ? '#ffaa00' : '#00ff66'; 
+          const gearPos = aircraft.gearPosition ?? (aircraft.gearRetracted ? 0 : 1);
+          const gearInTransit = aircraft.gearRetracted ? gearPos > 0.02 : gearPos < 0.98;
+          if (gearInTransit && !aircraft.config.fixedGear) {
+            this.gearVal.textContent = 'TRANSIT';
+            this.gearVal.style.color = '#ffea00';
+          } else {
+            this.gearVal.textContent = aircraft.gearRetracted ? 'UP' : 'DN';
+            this.gearVal.style.color = aircraft.gearRetracted ? '#ffaa00' : '#00ff66';
+          }
         }
 
         if (this.flapsVal) {
@@ -433,10 +440,15 @@ export class HudManager {
 
         if (this.crashWarning) {
           const prompt = this.getUnifiedPrompt('respawn', 'R');
-          this.crashWarning.innerHTML = `
-            <h2>** CRASHED **</h2>
-            <p>PRESS ${prompt} TO RESPAWN ON RUNWAY</p>
-          `;
+          // Only rewrite the DOM when the prompt glyph actually changes
+          // (keyboard <-> controller swap), not on every frame.
+          if (prompt !== this._lastCrashPrompt) {
+            this._lastCrashPrompt = prompt;
+            this.crashWarning.innerHTML = `
+              <h2>** CRASHED **</h2>
+              <p>PRESS ${prompt} TO RESPAWN ON RUNWAY</p>
+            `;
+          }
           if (aircraft.isCrashed) {
             this.crashWarning.classList.remove('hidden');
           } else {
@@ -447,7 +459,10 @@ export class HudManager {
         // Engine Ignition & Airbrake overlays updates
         if (this.engineWarning) {
           const prompt = this.getUnifiedPrompt('ignition', 'I');
-          this.engineWarning.innerHTML = `ENG SHUTDOWN - PRESS ${prompt} TO IGNITE`;
+          if (prompt !== this._lastEnginePrompt) {
+            this._lastEnginePrompt = prompt;
+            this.engineWarning.innerHTML = `ENG SHUTDOWN - PRESS ${prompt} TO IGNITE`;
+          }
           if (!aircraft.engineOn && !aircraft.isCrashed) {
             this.engineWarning.classList.remove('hidden');
           } else {
@@ -485,40 +500,58 @@ export class HudManager {
             if (ilsBox) ilsBox.classList.add('hidden');
           }
         }
-      }
+  }
 
-      getUnifiedPrompt(action, defaultKeyboardKey) {
+  getUnifiedPrompt(action, defaultKeyboardKey) {
     const hw = this.engine.moduleManager.get('Hardware');
     if (!hw || hw.lastInputDevice === 'keyboard') {
-      // Small keycap chip instead of quoted text like 'R'.
       const key = String(defaultKeyboardKey).replace(/['"]/g, '');
       return `<span class="btn-glyph btn-glyph-key">${key}</span>`;
     }
 
-    // Render a small controller-button icon rather than "(A)" style text.
-    // The face buttons keep their conventional colours; shoulder / stick /
-    // D-pad inputs use a neutral pill.
     const faceButtons = { 0: 'a', 1: 'b', 2: 'x', 3: 'y' };
-    const pillLabels = {
-      4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT',
-      10: 'L3', 11: 'R3', 12: 'D-UP', 13: 'D-DN', 14: 'D-LT', 15: 'D-RT'
-    };
+
     const glyph = (btnIndex) => {
+      // 1. Color-coded face buttons
       if (faceButtons[btnIndex] !== undefined) {
         const cls = faceButtons[btnIndex];
         return `<span class="btn-glyph btn-glyph-${cls}">${cls.toUpperCase()}</span>`;
       }
-      const label = pillLabels[btnIndex] ?? `B${btnIndex}`;
-      return `<span class="btn-glyph btn-glyph-pill">${label}</span>`;
+      // 2. Linear analog triggers (LT / RT)
+      if (btnIndex === 6 || btnIndex === 7) {
+        const label = btnIndex === 6 ? 'LT' : 'RT';
+        return `<span class="btn-glyph btn-glyph-trigger">${label}</span>`;
+      }
+      // 3. Flat bumpers (LB / RB)
+      if (btnIndex === 4 || btnIndex === 5) {
+        const label = btnIndex === 4 ? 'LB' : 'RB';
+        return `<span class="btn-glyph btn-glyph-bumper">${label}</span>`;
+      }
+      // 4. System buttons: VIEW (overlapping windows) and MENU (hamburger)
+      if (btnIndex === 8 || btnIndex === 9) {
+        const icon = btnIndex === 8 ? '⧉' : '≡';
+        const name = btnIndex === 8 ? 'View' : 'Menu';
+        return `<span class="btn-glyph btn-glyph-sys" title="${name} button">${icon}</span>`;
+      }
+      // 5. Clickable analog sticks (L3 / R3)
+      if (btnIndex === 10 || btnIndex === 11) {
+        const label = btnIndex === 10 ? 'L3' : 'R3';
+        return `<span class="btn-glyph btn-glyph-stick">${label}</span>`;
+      }
+      // 6. Directional D-Pad keys
+      if (btnIndex >= 12 && btnIndex <= 15) {
+        const arrow = { 12: '↑', 13: '↓', 14: '←', 15: '→' }[btnIndex];
+        return `<span class="btn-glyph btn-glyph-dpad">${arrow}</span>`;
+      }
+
+      return `<span class="btn-glyph btn-glyph-pill">B${btnIndex}</span>`;
     };
 
     if (action === 'gear') return glyph(hw.customBinds.gear);
     if (action === 'ignition') return glyph(hw.customBinds.ignition);
     if (action === 'respawn') return glyph(hw.customBinds.respawn);
-    if (action === 'flaps') return '<span class="btn-glyph btn-glyph-pill">D-PAD</span>';
+    if (action === 'flaps') return '<span class="btn-glyph btn-glyph-dpad">↑</span> / <span class="btn-glyph btn-glyph-dpad">↓</span>';
 
     return '';
   }
-    }
-
-    
+}

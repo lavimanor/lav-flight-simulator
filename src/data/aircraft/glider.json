@@ -14,6 +14,7 @@
   "criticalAoADeg": 14,
   "oswaldFactor": 0.95,
   "fixedGear": true,
+  "propStopDrag": 0.002,
   "emptyWeight": 520,
   "maxFuelCapacity": 45,
   "isJet": false,
